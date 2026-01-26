@@ -1,0 +1,40 @@
+############################
+# Cryptographic material (never commit)
+############################
+services/**/keys/
+services/**/wireguard/*.conf
+**/*.key
+**/*.pem
+**/*.p12
+**/.env
+
+############################
+# Packet captures (experimental artefacts)
+############################
+pcaps/
+*.pcap
+*.pcapng
+
+############################
+# Suricata raw runtime output
+############################
+results/suricata-alerts/eve.json
+results/suricata-alerts/fast.log
+results/suricata-alerts/stats.log
+results/suricata-alerts/files/
+
+############################
+# Temporary / generated files
+############################
+tmp/
+build/
+*~
+
+############################
+# Editor / OS noise
+############################
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
