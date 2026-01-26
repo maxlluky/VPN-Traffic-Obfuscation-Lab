@@ -15,13 +15,25 @@ docker compose -f baseline.yml up -d --build
 echo "[*] Restarting Suricata on $BR..."
 BRIDGE_IF="$BR" docker compose -f baseline.yml up -d --force-recreate suricata
 
-echo "[*] Capturing encrypted WG UDP traffic..."
-sudo timeout 20 tcpdump -ni "$BR" udp port 51820 -w "$PCAP_DIR/wg-baseline-$TS.pcap" >/dev/null 2>&1 || true
+PCAP="$PCAP_DIR/wg-baseline-$TS.pcap"
+echo "[*] Capturing encrypted WG UDP traffic on $BR -> $PCAP"
+sudo tcpdump -ni "$BR" udp port 51820 -w "$PCAP" >/dev/null 2>&1 &
+TCPDUMP_PID=$!
+
+# give tcpdump a moment to attach
+sleep 1
 
 echo "[*] Generating HTTP traffic through the tunnel..."
 for i in $(seq 1 50); do
   docker exec -it client-node sh -lc "curl -s http://172.18.0.2 >/dev/null" || true
 done
+
+# capture a little tail (keepalives/response)
+sleep 2
+
+echo "[*] Stopping tcpdump..."
+sudo kill -2 "$TCPDUMP_PID" 2>/dev/null || true
+wait "$TCPDUMP_PID" 2>/dev/null || true
 
 echo "[*] Copying Suricata logs..."
 cp "$HOME/vpn-lab/results/suricata-alerts/fast.log" "$PCAP_DIR/" 2>/dev/null || true
