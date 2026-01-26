@@ -1,9 +1,14 @@
 %YAML 1.1
 ---
+
 vars:
   address-groups:
     HOME_NET: "[10.0.0.0/8,172.16.0.0/12,192.168.0.0/16]"
     EXTERNAL_NET: "!$HOME_NET"
+
+default-rule-path: /var/lib/suricata/rules
+rule-files:
+  - local.rules
 
 outputs:
   - fast:
@@ -13,9 +18,14 @@ outputs:
       enabled: yes
       filetype: regular
       filename: eve.json
+      types:
+        - alert
+        - flow
+        - stats
 
-af-packet:
-  - interface: eth0
-    cluster-id: 99
-    cluster-type: cluster_flow
-    defrag: yes
+# If you run Suricata in host-network mode, set the interface to the Docker bridge:
+# af-packet:
+#   - interface: br-2be230386d09
+#     cluster-id: 99
+#     cluster-type: cluster_flow
+#     defrag: yes

@@ -34,27 +34,39 @@ services:
     build:
       context: ../services/client
     container_name: client-node
-    networks:
-      - client_net
+    network_mode: "service:wg-client"
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    depends_on:
+      - wg-client
+
+  wg-client:
+    build:
+      context: ../services/wg-client
+    container_name: wg-client
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ../services/wg-client/wireguard:/config:ro
+    networks:
+      - client_net
     depends_on:
       - gateway
 
   suricata:
     image: jasonish/suricata:latest
     container_name: suricata-ids
-    network_mode: "service:gateway"
+    network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_NICE
     volumes:
-      - ../services/suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ../services/suricata/suricata.yaml:/etc/suricata/suricata.yaml
+      - ../services/suricata/rules:/var/lib/suricata/rules
       - ../results/suricata-alerts:/var/log/suricata
-    command: ["-c", "/etc/suricata/suricata.yaml", "-i", "eth0"]
-    depends_on:
-      - gateway
+    command: ["-i", "${BRIDGE_IF:-br-2be230386d09}", "-l", "/var/log/suricata", "-c", "/etc/suricata/suricata.yaml"]
 
 networks:
   client_net:

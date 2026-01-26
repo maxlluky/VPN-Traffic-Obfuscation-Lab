@@ -18,12 +18,9 @@ pcaps/
 *.pcapng
 
 ############################
-# Suricata raw runtime output
+# Experimental results / artefacts
 ############################
-results/suricata-alerts/eve.json
-results/suricata-alerts/fast.log
-results/suricata-alerts/stats.log
-results/suricata-alerts/files/
+results/
 
 ############################
 # Temporary / generated files
