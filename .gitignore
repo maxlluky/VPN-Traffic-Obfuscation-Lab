@@ -1,12 +1,14 @@
 ############################
 # Cryptographic material (never commit)
 ############################
-services/**/keys/
-services/**/wireguard/*.conf
-**/*.key
-**/*.pem
-**/*.p12
-**/.env
+# Ignore all generated WireGuard state (keys, configs, QR codes, etc.)
+services/**/wireguard/**
+
+# Keep init scripts tracked
+!services/gateway/wireguard/custom-cont-init.d/
+!services/gateway/wireguard/custom-cont-init.d/**
+
+
 
 ############################
 # Packet captures (experimental artefacts)
