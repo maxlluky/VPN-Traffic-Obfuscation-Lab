@@ -2,119 +2,120 @@
 set -euo pipefail
 
 ###############################################################################
-# run_baseline.sh
-#
-# Purpose:
-#   Execute one reproducible baseline experiment run:
-#   - Start baseline docker compose stack
-#   - Determine the correct Docker bridge interface for client_net
-#   - Recreate Suricata sensor to sniff on that bridge
-#   - Clear Suricata output logs for a clean run
-#   - Capture encrypted WireGuard UDP traffic (port 51820) on the bridge
-#   - Automatically resolve the target container IP
-#   - Generate HTTP traffic through the VPN tunnel to the target
-#   - Save artefacts (pcap + Suricata logs) into a timestamped run directory
-#
-# Artefacts created:
-#   ~/vpn-lab/results/runs/baseline/<DD-MM-YYYY-HH-MM>/
-#     - wg-baseline.pcap
-#     - fast.log
-#     - eve.json
+# run_baseline.sh (robust)
+# - works with compose.yml in repo root
+# - does NOT hardcode docker network names
+# - resolves bridge interface via compose labels
 ###############################################################################
 
-# ---- Configuration ----------------------------------------------------------
-COMPOSE_FILE="$HOME/vpn-lab/compose/baseline.yml"
-NET_NAME="vpn-lab-baseline_client_net"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
 
-TARGET_CONTAINER="target-server"
-TARGET_PORT="80"
-HTTP_REQUESTS=50
-TCPDUMP_SECONDS_TAIL=2
+COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose.yml}"
 
-# UTC timestamp
-TS="$(date -u +"%d-%m-%Y-%H-%M")"
-RUN_DIR="$HOME/vpn-lab/results/runs/baseline/${TS}"
+# Which compose network key to sniff on: "external_net" or "client_net"
+SNIFF_KEY="${SNIFF_KEY:-external_net}"
 
-# Suricata log files (host path)
-SURICATA_LOG_DIR="$HOME/vpn-lab/results/suricata-alerts"
+TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
+CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
+TARGET_PORT="${TARGET_PORT:-80}"
+HTTP_REQUESTS="${HTTP_REQUESTS:-50}"
+TCPDUMP_SECONDS_TAIL="${TCPDUMP_SECONDS_TAIL:-2}"
+
+TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+RUN_DIR="$REPO_ROOT/results/runs/baseline/$TS"
+
+SURICATA_LOG_DIR="$REPO_ROOT/results/suricata-alerts"
 FAST_LOG="$SURICATA_LOG_DIR/fast.log"
 EVE_LOG="$SURICATA_LOG_DIR/eve.json"
 
-mkdir -p "$RUN_DIR"
+PCAP_FILE="$RUN_DIR/wg-baseline.pcap"
 
-# ---- Helper functions -------------------------------------------------------
 log() { echo "[*] $*"; }
 die() { echo "[!] $*" >&2; exit 1; }
 
-# Ensure docker is usable (avoid confusing failures later)
-docker ps >/dev/null 2>&1 || die "Docker daemon not accessible. Does 'docker ps' work without sudo?"
+mkdir -p "$RUN_DIR" "$SURICATA_LOG_DIR"
 
-# ---- Start stack ------------------------------------------------------------
-log "Starting baseline stack..."
-cd "$HOME/vpn-lab/compose"
+docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
+
+# --- Start stack ---
+log "Starting stack..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
-# ---- Resolve dynamic interfaces / IPs ---------------------------------------
-# Bridge interface for client_net (changes after down/up)
-BRIDGE_IF="br-$(docker network inspect "$NET_NAME" --format '{{.Id}}' | cut -c1-12)"
+# --- Determine compose project name (reliable via container label) ---
+PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
+[[ -n "$PROJECT" ]] || die "Could not determine compose project from '$TARGET_CONTAINER'. Is the stack up?"
 
-# Resolve target container IP (always use external_net IP in your topology)
-# We prefer external_net (vpn-lab-baseline_external_net) if present.
-TARGET_IP="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{if eq $k "vpn-lab-baseline_external_net"}}{{$v.IPAddress}}{{end}}{{end}}' "$TARGET_CONTAINER" 2>/dev/null || true)"
-if [[ -z "$TARGET_IP" ]]; then
-  # Fallback: first available network IP
-  TARGET_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$TARGET_CONTAINER" 2>/dev/null || true)"
+log "Compose project: $PROJECT"
+log "Sniff network key: $SNIFF_KEY"
+
+# --- Find docker network ID by compose labels (NO hardcoded names) ---
+NET_ID="$(docker network ls -q --filter "label=com.docker.compose.project=$PROJECT" --filter "label=com.docker.compose.network=$SNIFF_KEY" | head -n 1)"
+[[ -n "$NET_ID" ]] || die "Could not find network for project=$PROJECT and network=$SNIFF_KEY."
+
+# --- Resolve bridge interface name from the network options ---
+BRIDGE_IF="$(docker network inspect "$NET_ID" -f '{{index .Options "com.docker.network.bridge.name"}}' 2>/dev/null || true)"
+
+# Fallback: Docker usually names user-defined bridge as br-<first12(network_id)>
+if [[ -z "${BRIDGE_IF:-}" || "$BRIDGE_IF" == "<no value>" ]]; then
+  BRIDGE_IF="br-${NET_ID:0:12}"
 fi
-[[ -n "$TARGET_IP" ]] || die "Could not resolve IP address for container '$TARGET_CONTAINER'. Is it running?"
 
-PCAP_FILE="$RUN_DIR/wg-baseline.pcap"
+# Validate that the interface exists on the host
+if ! ip link show "$BRIDGE_IF" >/dev/null 2>&1; then
+  echo "[!] Bridge interface '$BRIDGE_IF' not found on host."
+  echo "[!] Available bridges:"
+  ip -br link | awk '$1 ~ /^br-|^docker0/ {print "    " $0}'
+  die "Could not resolve a valid bridge interface for network id $NET_ID."
+fi
 
+
+# --- Resolve target IP on the external_net (compose key) ---
+# We find the actual docker network name for external_net via the same labels
+EXT_NET_ID="$(docker network ls -q --filter "label=com.docker.compose.project=$PROJECT" --filter "label=com.docker.compose.network=external_net" | head -n 1)"
+[[ -n "$EXT_NET_ID" ]] || die "Could not find external_net for project=$PROJECT."
+EXT_NET_NAME="$(docker network inspect "$EXT_NET_ID" -f '{{.Name}}')"
+
+TARGET_IP="$(docker inspect -f "{{with index .NetworkSettings.Networks \"$EXT_NET_NAME\"}}{{.IPAddress}}{{end}}" "$TARGET_CONTAINER" 2>/dev/null || true)"
+[[ -n "$TARGET_IP" ]] || die "Could not resolve target IP for '$TARGET_CONTAINER' on external_net."
+
+log "Bridge IF: $BRIDGE_IF"
+log "Target: $TARGET_CONTAINER => $TARGET_IP:$TARGET_PORT"
 log "Run directory: $RUN_DIR"
-log "Client network: $NET_NAME"
-log "Bridge interface: $BRIDGE_IF"
-log "Target container: $TARGET_CONTAINER"
-log "Target IP: $TARGET_IP:$TARGET_PORT"
 
-# ---- Ensure Suricata sniffs the correct interface ---------------------------
-log "Recreating Suricata sensor to sniff on $BRIDGE_IF..."
-BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_FILE" up -d --force-recreate suricata
+# --- Recreate Suricata to sniff on the chosen bridge ---
+log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
+BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps suricata
 
-# ---- Prepare clean Suricata logs for this run -------------------------------
-log "Resetting Suricata logs (fast.log, eve.json)..."
-sudo mkdir -p "$SURICATA_LOG_DIR"
+# --- Reset logs ---
+log "Resetting Suricata logs..."
+sudo -v
 sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
 
-# ---- Start tcpdump capture (background) -------------------------------------
-# IMPORTANT: Capture must run while traffic is generated, otherwise PCAP can be empty.
-log "Starting tcpdump capture (encrypted WireGuard UDP/51820) -> $PCAP_FILE"
-sudo -v
-
+# --- Capture WG UDP/51820 ---
+log "Starting tcpdump on $BRIDGE_IF (udp/51820) -> $PCAP_FILE"
 sudo tcpdump -ni "$BRIDGE_IF" udp port 51820 -w "$PCAP_FILE" >/dev/null 2>&1 &
 TCPDUMP_PID=$!
-
-# Give tcpdump a moment to attach
 sleep 1
 
-# ---- Generate traffic through the tunnel ------------------------------------
-log "Generating HTTP traffic through the tunnel (${HTTP_REQUESTS} requests)..."
+# --- Generate traffic ---
+log "Generating HTTP traffic ($HTTP_REQUESTS requests)..."
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  docker exec -it client-node sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
+  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
 done
 
-# Capture a little tail (keepalives/responses)
 sleep "$TCPDUMP_SECONDS_TAIL"
 
-# ---- Stop tcpdump cleanly ---------------------------------------------------
+# --- Stop tcpdump ---
 log "Stopping tcpdump..."
 sudo kill -2 "$TCPDUMP_PID" 2>/dev/null || true
 wait "$TCPDUMP_PID" 2>/dev/null || true
 
-# ---- Copy Suricata logs to run directory ------------------------------------
-log "Copying Suricata logs into run directory..."
-if cp "$FAST_LOG" "$RUN_DIR/fast.log" 2>/dev/null; then :; else sudo cp "$FAST_LOG" "$RUN_DIR/fast.log"; fi
-if cp "$EVE_LOG"  "$RUN_DIR/eve.json"  2>/dev/null; then :; else sudo cp "$EVE_LOG"  "$RUN_DIR/eve.json";  fi
+# --- Copy logs ---
+log "Copying Suricata logs..."
+sudo cp "$FAST_LOG" "$RUN_DIR/fast.log" 2>/dev/null || cp "$FAST_LOG" "$RUN_DIR/fast.log"
+sudo cp "$EVE_LOG"  "$RUN_DIR/eve.json" 2>/dev/null || cp "$EVE_LOG"  "$RUN_DIR/eve.json"
 
-# ---- Quick sanity output -----------------------------------------------------
 log "Artefacts created:"
 ls -lah "$RUN_DIR" | sed 's/^/    /'
 

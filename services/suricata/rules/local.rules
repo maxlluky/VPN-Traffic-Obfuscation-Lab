@@ -1,1 +1,1 @@
-alert udp any any -> any 51820 (msg:"WG baseline: UDP 51820 observed"; sid:1000001; rev:1;)
+alert http any any -> 172.30.30.10 any (msg:"VPN-LAB HTTP to target"; sid:1000001; rev:1;)
