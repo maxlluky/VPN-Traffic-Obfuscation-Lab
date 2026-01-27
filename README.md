@@ -9,6 +9,7 @@ VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, ud
 - `docs/` – notes, diagrams, screenshots (no sensitive data)
 - `results/` – exported logs/metrics (sanitised)
 - `pcaps/` – packet captures (excluded from git)
+- `scripts/` – 
 
 ## 🚀 Quickstart
 This section describes how to run the baseline WireGuard VPN experiment and generate Suricata detection results.
@@ -43,12 +44,12 @@ Edit .env if required (image versions, interface names, etc.).
 ### 3️⃣ Start the baseline experiment stack
 Build and start the containers:
 ```bash
-docker compose -f compose/baseline.yml up -d --build
+docker compose -f compose.yml up -d --build
 ```
 
 Check container status:
 ```bash
-docker compose -f compose/baseline.yml ps
+docker compose ps -a
 ```
 All services should reach the `running` state.
 
@@ -85,11 +86,11 @@ jq '.alert.signature' results/suricata-alerts/eve.json
 ### 6️⃣ Stop and clean up
 Stop the experiment stack:
 ```bash
-docker compose -f compose/baseline.yml down
+docker compose -f down
 ```
 Remove volumes (Optional):
 ```bash
-docker compose -f compose/baseline.yml down -v
+docker compose -f down -v
 ```
 
 ## Experimental Notes
