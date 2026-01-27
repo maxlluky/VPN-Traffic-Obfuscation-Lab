@@ -1,17 +1,24 @@
 # VPN Obfuscation Lab (Bachelor Project)
-
 This repository contains a reproducible Docker-based testbed to evaluate the detectability of
 VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS.
 
+---
 ## Structure
-- `compose/` – docker compose scenarios (baseline / obfs4 / udp2raw)
-- `services/` – container build contexts and configs (client, gateway, suricata, target)
-- `docs/` – notes, diagrams, screenshots (no sensitive data)
-- `results/` – exported logs/metrics (sanitised)
+- `compose.yml` – single Docker Compose file using profiles for baseline / obfs4 / udp2raw
+- `services/` – container build contexts and service-specific configuration
+  - `client/` – traffic generator (curl, iperf)
+  - `wg-client/` – WireGuard client and routing logic
+  - `gateway/` – WireGuard server / VPN gateway
+  - `suricata/` – IDS configuration and rules
+- `scripts/`
+  - `runs/` – reproducible experiment runner scripts
+  - `dev/` – helper scripts for local development
+- `docs/` – architecture diagrams and notes
+- `results/` – experiment outputs (sanitised, excluded from git)
 - `pcaps/` – packet captures (excluded from git)
-- `scripts/` – 
 
-## 🚀 Quickstart
+---
+## Quickstart
 This section describes how to run the baseline WireGuard VPN experiment and generate Suricata detection results.
 
 **Prerequisites:**
@@ -44,7 +51,7 @@ Edit .env if required (image versions, interface names, etc.).
 ### 3️⃣ Start the baseline experiment stack
 Build and start the containers:
 ```bash
-docker compose -f compose.yml up -d --build
+docker compose up -d --build
 ```
 
 Check container status:
@@ -83,48 +90,76 @@ results/
 jq '.alert.signature' results/suricata-alerts/eve.json
 ```
 
+Ersetze Abschnitt 6 komplett durch:
+
 ### 6️⃣ Stop and clean up
 Stop the experiment stack:
 ```bash
-docker compose -f down
-```
-Remove volumes (Optional):
-```bash
-docker compose -f down -v
+docker compose down
 ```
 
+Remove volumes (optional):
+```
+docker compose down -v
+```
+
+---
 ## Experimental Notes
-This lab uses **Docker Compose profiles** to enable/disable obfuscation scenarios without duplicating compose files.
-- **baseline** (default): WireGuard without obfuscation
-- **obfs4** (profile): baseline + obfs4 components enabled
-- **udp2raw** (profile): baseline + udp2raw components enabled
+This lab uses a **single Docker Compose file with profiles** to enable or disable obfuscation
+scenarios without duplicating configuration.
 
-Artefacts such as **packet captures (`pcaps/`)** and **experiment outputs (`results/`)** are intentionally excluded from Git.
-  Store them locally and only publish sanitised excerpts if needed for documentation.
+Available scenarios:
+- **baseline** (default): plain WireGuard over UDP
+- **udp2raw** (profile): WireGuard traffic wrapped using udp2raw
+- **obfs4** (profile): WireGuard traffic transported via obfs4-based obfuscation components
 
-For reproducibility, image versions should be pinned (no `:latest`). The exact versions used for experiments should be recorded in `.env` (local) and documented in the thesis/report.
+Traffic generation is fully decoupled from the VPN implementation:
+- `client-node` acts as a generic traffic generator (curl, iperf)
+- `wg-client` implements the VPN client stack and routing logic
 
-Network interfaces for Suricata capture can differ between hosts. If an interface/bridge name is required (e.g. `BRIDGE_IF`),
-it should be provided via `.env` or the run script and must not rely on hardcoded defaults.
+This separation ensures that **identical application traffic** is generated across all scenarios,
+allowing meaningful comparison of detectability between baseline and obfuscated transports.
 
+Suricata runs in **host mode** and passively monitors Docker bridge interfaces.
+The correct capture interface is **resolved automatically at runtime** by the experiment runner
+scripts and does not rely on hardcoded interface names.
+
+Packet captures (`pcaps/`) and experiment results (`results/`) are intentionally excluded from Git.
+Only sanitised excerpts should be included in documentation or publications.
+
+---
+## Architecture Overview
+The experimental setup consists of two isolated Docker networks:
+
+- `client_net (192.168.10.0/24)` – VPN client-side network
+- `external_net (172.30.30.0/24)` – simulated external / target network
+
+The VPN gateway is connected to both networks and routes traffic between them via a WireGuard tunnel.
+Application traffic is generated exclusively by the `client-node` container, which shares its
+network namespace with the `wg-client` container.
+
+This design ensures a clean separation between:
+- application-layer traffic generation, and
+- transport-layer VPN and obfuscation mechanisms.
+
+![etwork topology and traffic flow](/docs/Architecture-diagram.png)
+
+---
 ## Next Steps
 1. **Implement profile-based scenarios**
-   - Add `profiles: ["obfs4"]` services and adjust routing so baseline traffic can be wrapped via obfs4.
-   - Add `profiles: ["udp2raw"]` services and integrate them similarly.
+   - Add `profiles: ["udp2raw"]` services and integrate udp2raw between the WireGuard client and gateway.
+   - Add `profiles: ["obfs4"]` services and route WireGuard traffic through obfs4-based transport components.
 
-2. **Pin container images**
-   - Replace `:latest` with fixed tags (or digests) and document tested versions.
-
-3. **Single entrypoint runner**
+2. **Single entrypoint runner**
    - Add a unified runner script such as:
      - `bash scripts/runs/run_scenario.sh baseline|obfs4|udp2raw`
    - The script should start the correct profile, wait for readiness, generate traffic, and collect artefacts.
 
-4. **Health checks and startup order**
+3. **Health checks and startup order**
    - Add `healthcheck` to critical services (gateway, suricata, target) and use `depends_on` with health conditions where supported.
 
-5. **Result comparison**
+4. **Result comparison**
    - Add a small script to compare Suricata outputs across scenarios (baseline vs obfs4 vs udp2raw), e.g. signature counts, alert rate, timing.
 
-6. **Documentation**
+5. **Documentation**
    - Add a short architecture diagram and explain where obfuscation is applied in the traffic path for each profile.
