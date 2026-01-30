@@ -18,5 +18,9 @@ exec udp2raw \
   -c \
   -l "127.0.0.1:$TARGET_PORT" \
   -r "$SERVER:$SERVER_PORT" \
-  --raw-mode TCP \
-  -k "vpn-lab-obfs"
+  --raw-mode faketcp \
+  -k "vpn-lab-obfs" \
+  --cipher-mode xor \
+  --auth-mode simple \
+  -a \
+  > /dev/stdout 2>&1

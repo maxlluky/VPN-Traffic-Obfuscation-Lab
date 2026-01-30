@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
 COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose.yml}"
 
 # Which compose network key to sniff on: "external_net" or "client_net"
-SNIFF_KEY="${SNIFF_KEY:-external_net}"
+SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
 TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
 CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
@@ -40,7 +40,10 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack ---
 log "Starting stack..."
-docker compose -f "$COMPOSE_FILE" up -d --build
+COMPOSE_FLAGS="-f $COMPOSE_FILE -f $REPO_ROOT/compose.baseline.yml"
+# Ensure clean slate
+docker compose $COMPOSE_FLAGS down --remove-orphans >/dev/null 2>&1 || true
+docker compose $COMPOSE_FLAGS up -d --build --remove-orphans
 
 # --- Determine compose project name (reliable via container label) ---
 PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
@@ -83,14 +86,14 @@ log "Bridge IF: $BRIDGE_IF"
 log "Target: $TARGET_CONTAINER => $TARGET_IP:$TARGET_PORT"
 log "Run directory: $RUN_DIR"
 
-# --- Recreate Suricata to sniff on the chosen bridge ---
-log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
-BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps suricata
-
 # --- Reset logs ---
 log "Resetting Suricata logs..."
 sudo -v
 sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
+
+# --- Recreate Suricata to sniff on the chosen bridge ---
+log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
+BRIDGE_IF="$BRIDGE_IF" docker compose $COMPOSE_FLAGS up -d --force-recreate --no-deps suricata
 
 # --- Capture WG UDP/51820 ---
 log "Starting tcpdump on $BRIDGE_IF (udp/51820) -> $PCAP_FILE"
@@ -100,9 +103,20 @@ sleep 1
 
 # --- Generate traffic ---
 log "Generating HTTP traffic ($HTTP_REQUESTS requests)..."
+FAIL_COUNT=0
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
+  if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null"; then
+      log "WARNING: Request $i failed or timed out."
+      FAIL_COUNT=$((FAIL_COUNT+1))
+      if [ "$FAIL_COUNT" -ge 10 ]; then
+        die "Aborting: 10 consecutive failures detected."
+      fi
+  else
+      printf "."
+      FAIL_COUNT=0
+  fi
 done
+echo ""
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 

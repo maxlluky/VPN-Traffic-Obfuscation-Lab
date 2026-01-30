@@ -194,6 +194,8 @@ rm -rf results/runs/* results/suricata-alerts/*
 ## Architecture
 
 ### Network Topology
+![Architecture Diagram](docs/Architecture-diagram.png)
+
 The testbed uses two isolated Docker networks:
 
 - **`client_net` (192.168.10.0/24)** – VPN client-side network

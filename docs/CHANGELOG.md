@@ -59,16 +59,14 @@
   - Improved services/ directory organization (gateway/udp2raw, wg-client/obfs4, etc.)
   - Run scripts now explicitly use `-f compose.yml -f compose.<scenario>.yml`
 
-### Technical Details
-- All scenarios use identical `client-node` for consistent application traffic
-- WireGuard client configs point to localhost:51820 for obfuscation scenarios
-  - UDP2RAW and OBFS4 unwrap at localhost:51820 before WireGuard client connects
-- Suricata captures on correct port per scenario (UDP/51820, TCP/443, TCP/12345)
-- tcpdump runs parallel to Suricata for independent packet capture
-- All experiment artifacts timestamped and organized per scenario
-- Environment variables from `.env` are automatically loaded by `docker compose`
-  - Scripts use `-f compose.yml -f compose.<scenario>.yml` without explicit sourcing
-
 ### Fixed
-- Removed circular dependency in compose.udp2raw.yml and compose.obfs4.yml
-  - `udp2raw-client` and `obfs4-client` now share network namespace without depends_on loops
+- **Reliability & Logging**
+  - Resolved issue with empty Suricata logs (`fast.log`) by disabling checksum validation (`stream.checksum_validation: no`) for virtualized environments.
+  - Fixed log rotation logic: truncated logs *before* starting Suricata to prevent sparse file issues.
+  - Implemented **fail-fast mechanism** in all run scripts: experiments abort immediately after 10 consecutive connection timeouts.
+
+- **Networking & Stability**
+  - **Enforced Static IPs**: Replaced all hostname references with static IPs in `compose.*.yml` and entrypoints to remove DNS dependency and race conditions.
+  - **NAT Routing**: Improved gateway `10-nat.sh` to auto-detect the correct WAN interface instead of assuming `eth1`.
+  - **UDP2RAW**: Corrected invalid parameter `--raw-mode TCP` to `--raw-mode faketcp`.
+  - **Port Conflicts**: Changed WireGuard listen port to `51821` in obfuscation clients to avoid conflict with local tunnel endpoints on `51820`.

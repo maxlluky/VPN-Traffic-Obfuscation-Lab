@@ -21,13 +21,17 @@ if [ "$MODE" = "server" ]; then
     -s \
     -l "0.0.0.0:$LISTEN_PORT" \
     -r "$TARGET_HOST:$TARGET_PORT" \
-    --raw-mode TCP \
-    -k "vpn-lab-obfs"
+    --raw-mode faketcp \
+    -k "vpn-lab-obfs" \
+    --cipher-mode xor \
+    --auth-mode simple \
+    -a \
+    > /dev/stdout 2>&1
 else
   exec udp2raw \
     -c \
     -l "127.0.0.1:$TARGET_PORT" \
-    -r "$TARGET_HOST:$LISTEN_PORT" \
+    -r "$TARGET_IP:$LISTEN_PORT" \
     --raw-mode TCP \
     -k "vpn-lab-obfs"
 fi

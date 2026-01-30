@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
 COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose.yml}"
 COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose.udp2raw.yml}"
 
-SNIFF_KEY="${SNIFF_KEY:-external_net}"
+SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
 TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
 CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
@@ -40,7 +40,9 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack with udp2raw override ---
 log "Starting stack with UDP2RAW obfuscation..."
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --build
+# Ensure clean slate
+docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" down --remove-orphans >/dev/null 2>&1 || true
+docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --build --remove-orphans
 
 # --- Determine compose project name ---
 PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
@@ -81,6 +83,11 @@ log "Target: $TARGET_CONTAINER => $TARGET_IP:$TARGET_PORT"
 log "Run directory: $RUN_DIR"
 log "UDP2RAW: WireGuard traffic wrapped in TCP/443"
 
+# --- Reset logs ---
+log "Resetting Suricata logs..."
+sudo -v
+sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
+
 # --- Recreate Suricata ---
 log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
 BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --force-recreate --no-deps suricata
@@ -88,11 +95,6 @@ BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" 
 # --- Wait for obfuscation proxies to be ready ---
 log "Waiting for UDP2RAW tunnels to initialize..."
 sleep 3
-
-# --- Reset logs ---
-log "Resetting Suricata logs..."
-sudo -v
-sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
 
 # --- Capture traffic ---
 log "Starting tcpdump on $BRIDGE_IF (tcp/443 for udp2raw) -> $PCAP_FILE"
@@ -102,9 +104,20 @@ sleep 1
 
 # --- Generate traffic ---
 log "Generating HTTP traffic through UDP2RAW tunnel ($HTTP_REQUESTS requests)..."
+FAIL_COUNT=0
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
+  if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null"; then
+      log "WARNING: Request $i failed or timed out."
+      FAIL_COUNT=$((FAIL_COUNT+1))
+      if [ "$FAIL_COUNT" -ge 10 ]; then
+        die "Aborting: 10 consecutive failures detected."
+      fi
+  else
+      printf "."
+      FAIL_COUNT=0
+  fi
 done
+echo ""
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 

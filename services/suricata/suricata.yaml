@@ -22,3 +22,7 @@ outputs:
         - alert
         - flow
         - stats
+
+# Disable checksum validation for virtual environments
+stream:
+  checksum-validation: no

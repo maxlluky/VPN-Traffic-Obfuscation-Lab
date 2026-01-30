@@ -21,10 +21,10 @@ services:
       - ./services/gateway/wireguard:/config
       - /lib/modules:/lib/modules:ro
     networks:
-      client_net:
-        ipv4_address: 192.168.10.2
       internal_net:
         ipv4_address: 192.168.20.2
+      external_net:
+        ipv4_address: 172.30.30.2
     expose:
       - "51820"
     depends_on:
@@ -38,14 +38,14 @@ services:
     environment:
       - MODE=server
       - LISTEN_PORT=${UDP2RAW_GATEWAY_PORT:-443}
-      - TARGET_HOST=gateway
+      - TARGET_HOST=192.168.20.2
       - TARGET_PORT=51820
     volumes:
       - ./services/gateway/udp2raw/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /entrypoint.sh
     networks:
-      external_net:
-        ipv4_address: 172.30.30.2
+      client_net:
+        ipv4_address: 192.168.10.3
       internal_net:
         ipv4_address: 192.168.20.3
 
@@ -72,7 +72,7 @@ services:
       - NET_ADMIN
     environment:
       - MODE=client
-      - SERVER=udp2raw-gateway
+      - SERVER=192.168.10.3
       - SERVER_PORT=${UDP2RAW_GATEWAY_PORT:-443}
       - TARGET_PORT=51820
     volumes:

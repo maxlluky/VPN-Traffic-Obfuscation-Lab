@@ -21,10 +21,10 @@ services:
       - ./services/gateway/wireguard:/config
       - /lib/modules:/lib/modules:ro
     networks:
-      client_net:
-        ipv4_address: 192.168.10.2
       internal_net:
         ipv4_address: 192.168.20.2
+      external_net:
+        ipv4_address: 172.30.30.2
     expose:
       - "51820"
     depends_on:
@@ -41,13 +41,13 @@ services:
     environment:
       - MODE=server
       - LISTEN_PORT=${OBFS4_PORT:-12345}
-      - TARGET_HOST=gateway
+      - TARGET_HOST=192.168.20.2
       - TARGET_PORT=51820
     volumes:
       - ./services/obfs4/server:/config:ro
     networks:
-      external_net:
-        ipv4_address: 172.30.30.2
+      client_net:
+        ipv4_address: 192.168.10.3
       internal_net:
         ipv4_address: 192.168.20.3
 
@@ -77,7 +77,7 @@ services:
       - NET_ADMIN
     environment:
       - MODE=client
-      - SERVER=obfs4-gateway
+      - SERVER=192.168.10.3
       - SERVER_PORT=${OBFS4_PORT:-12345}
       - TARGET_PORT=51820
     volumes:
