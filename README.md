@@ -1,4 +1,7 @@
-![Logo](docs/Logo.png) # VPN Obfuscation Lab (Bachelor Project)
+<img src= docs/Logo.png? align="left" height="60" />
+# VPN Obfuscation Lab (Bachelor Project)
+
+
 
 This repository contains a reproducible Docker-based testbed to evaluate the detectability of VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS.
 
