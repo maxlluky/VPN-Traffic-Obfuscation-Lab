@@ -106,17 +106,17 @@ bash scripts/runs/run_udp2raw.sh
 
 **What it does:**
 - Starts `compose.yml` + `compose.udp2raw.yml`
-- Wraps WireGuard (UDP/51820) in TCP/443 using udp2raw
+- Wraps WireGuard (UDP/51820) in TCP/443 using udp2raw (faketcp mode)
 - Gateway unwraps TCP → UDP and forwards to WireGuard
 - Client unwraps UDP ← TCP from the gateway
-- Captures TCP/443 packets
+- Captures TCP/443 packets (obfuscated traffic)
 - Generates HTTP traffic through the VPN
-- Collects Suricata IDS alerts
+- Collects Suricata IDS alerts (detects TCP/443 traffic instead of UDP/51820)
 - Stores artifacts in `results/runs/udp2raw/<timestamp>/`
 
 **Network topology:**
 ```
-[client-node] → [udp2raw-client] → (TCP/443) → [udp2raw-gateway] → [gateway/WireGuard]
+[client-node] → (UDP/51820) → [udp2raw-client] → (TCP/443) → [udp2raw-gateway] → (UDP/51820) → [gateway/WireGuard]
 ```
 
 ### Scenario 3: OBFS4 Obfuscation
