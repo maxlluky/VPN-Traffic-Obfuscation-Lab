@@ -6,13 +6,13 @@ This repository contains a reproducible Docker-based testbed to evaluate the det
 
 ## Project Structure
 
-### Docker Compose Files
-The project uses **multiple compose files** for clarity and modularity:
+### Docker Compose Files (`compose/`)
+The project uses **multiple compose files** for clarity and modularity, located in the `compose/` directory:
 
-- `compose.yml` – Base configuration (target, suricata, networks)
-- `compose.baseline.yml` – Baseline scenario: plain WireGuard
-- `compose.udp2raw.yml` – UDP2RAW obfuscation: WireGuard wrapped in TCP/443
-- `compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped in obfs4 protocol
+- `compose/compose.yml` – Base configuration (target, suricata, networks)
+- `compose/compose.baseline.yml` – Baseline scenario: plain WireGuard
+- `compose/compose.udp2raw.yml` – UDP2RAW obfuscation: WireGuard wrapped in TCP/443
+- `compose/compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped in obfs4 protocol
 
 ### Services Directory
 ```
@@ -62,14 +62,14 @@ cd vpn-lab
 
 ### 2️⃣ Prepare environment variables
 ```bash
-cp .env.example .env
+cp compose/.env.example compose/.env
 ```
-Edit `.env` if required. Key variables:
+Edit `compose/.env` if required. Key variables:
 - `BRIDGE_IF`: Docker bridge interface (auto-detected by scripts)
 - `UDP2RAW_GATEWAY_PORT`: TCP port for UDP2RAW (default: 443)
 - `OBFS4_PORT`: TCP port for OBFS4 (default: 12345)
 
-> ⚠️ Do not commit `.env` — it may contain system-specific configuration.
+> ⚠️ Do not commit `compose/.env` — it may contain system-specific configuration.
 
 ---
 
@@ -83,7 +83,7 @@ bash scripts/runs/run_baseline.sh
 ```
 
 **What it does:**
-- Starts `compose.yml` + `compose.baseline.yml`
+- Starts `compose/compose.yml` + `compose/compose.baseline.yml`
 - Captures UDP/51820 (WireGuard) packets
 - Generates HTTP traffic through the VPN
 - Collects Suricata IDS alerts
@@ -105,7 +105,7 @@ bash scripts/runs/run_udp2raw.sh
 ```
 
 **What it does:**
-- Starts `compose.yml` + `compose.udp2raw.yml`
+- Starts `compose/compose.yml` + `compose/compose.udp2raw.yml`
 - Wraps WireGuard (UDP/51820) in TCP/443 using udp2raw
 - Gateway unwraps TCP → UDP and forwards to WireGuard
 - Client unwraps UDP ← TCP from the gateway
@@ -127,7 +127,7 @@ bash scripts/runs/run_obfs4.sh
 ```
 
 **What it does:**
-- Starts `compose.yml` + `compose.obfs4.yml`
+- Starts `compose/compose.yml` + `compose/compose.obfs4.yml`
 - Wraps WireGuard (UDP/51820) in OBFS4 protocol using obfs4proxy
 - Gateway accepts obfs4 connections and unwraps to WireGuard
 - Client wraps UDP/51820 in obfs4 before sending
@@ -170,18 +170,18 @@ done
 
 ### Stop current stack
 ```bash
-docker compose -f compose.yml -f compose.baseline.yml down
+docker compose -f compose/compose.yml -f compose/compose.baseline.yml down
 # or
-docker compose -f compose.yml -f compose.udp2raw.yml down
+docker compose -f compose/compose.yml -f compose/compose.udp2raw.yml down
 # or
-docker compose -f compose.yml -f compose.obfs4.yml down
+docker compose -f compose/compose.yml -f compose/compose.obfs4.yml down
 ```
 
 ### Remove all containers and networks
 ```bash
-docker compose -f compose.yml -f compose.baseline.yml down -v
-docker compose -f compose.yml -f compose.udp2raw.yml down -v
-docker compose -f compose.yml -f compose.obfs4.yml down -v
+docker compose -f compose/compose.yml -f compose/compose.baseline.yml down -v
+docker compose -f compose/compose.yml -f compose/compose.udp2raw.yml down -v
+docker compose -f compose/compose.yml -f compose/compose.obfs4.yml down -v
 ```
 
 ### Clean experiment results (optional)
@@ -286,7 +286,7 @@ docker logs suricata-ids
 
 ### Rebuild a specific service
 ```bash
-docker compose -f compose.yml -f compose.udp2raw.yml up -d --build wg-client
+docker compose -f compose/compose.yml -f compose/compose.udp2raw.yml up -d --build wg-client
 ```
 
 ---

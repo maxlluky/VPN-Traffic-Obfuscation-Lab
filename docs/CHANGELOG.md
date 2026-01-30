@@ -54,14 +54,15 @@
   - Advanced usage examples with custom parameters
 
 ### Changed
-- **Project structure**
-  - Separated baseline/obfuscation configs into distinct compose files
-  - Improved services/ directory organization (gateway/udp2raw, wg-client/obfs4, etc.)
-  - Run scripts now explicitly use `-f compose.yml -f compose.<scenario>.yml`
+- **Project Structure Refactor**
+  - Moved all Docker Compose files (`compose*.yml`) and configuration (`.env`, `.env.example`) into a dedicated `compose/` directory.
+  - Updated all automation scripts (`run_*.sh`) to support the new directory structure.
+  - Improved `services/` directory organization (gateway/udp2raw, wg-client/obfs4, etc.).
+  - Run scripts now explicitly use `--env-file` and `-f` flags to locate config files correctly.
 
 ### Fixed
 - **Reliability & Logging**
-  - Resolved issue with empty Suricata logs (`fast.log`) by disabling checksum validation (`stream.checksum_validation: no`) for virtualized environments.
+  - Resolved issue with empty Suricata logs (`fast.log`) by disabling checksum validation (`stream.checksum-validation: no`) for virtualized environments.
   - Fixed log rotation logic: truncated logs *before* starting Suricata to prevent sparse file issues.
   - Implemented **fail-fast mechanism** in all run scripts: experiments abort immediately after 10 consecutive connection timeouts.
 

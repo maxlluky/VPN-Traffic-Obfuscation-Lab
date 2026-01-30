@@ -20,9 +20,9 @@ services:
       - NET_RAW
       - SYS_NICE
     volumes:
-      - ./services/suricata/suricata.yaml:/etc/suricata/suricata.yaml
-      - ./services/suricata/rules:/var/lib/suricata/rules
-      - ./results/suricata-alerts:/var/log/suricata
+      - ../services/suricata/suricata.yaml:/etc/suricata/suricata.yaml
+      - ../services/suricata/rules:/var/lib/suricata/rules
+      - ../results/suricata-alerts:/var/log/suricata
     command: ["-i", "${BRIDGE_IF}", "-l", "/var/log/suricata", "-c", "/etc/suricata/suricata.yaml"]
 
 networks:

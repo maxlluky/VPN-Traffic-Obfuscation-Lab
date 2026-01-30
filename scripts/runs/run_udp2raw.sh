@@ -11,8 +11,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Use both base and udp2raw compose files
-COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose.yml}"
-COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose.udp2raw.yml}"
+COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose/compose.yml}"
+COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose/compose.udp2raw.yml}"
 
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
@@ -40,9 +40,10 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack with udp2raw override ---
 log "Starting stack with UDP2RAW obfuscation..."
+COMPOSE_FLAGS="--env-file $REPO_ROOT/compose/.env -f $COMPOSE_BASE -f $COMPOSE_OVERRIDE"
 # Ensure clean slate
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" down --remove-orphans >/dev/null 2>&1 || true
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --build --remove-orphans
+docker compose $COMPOSE_FLAGS down --remove-orphans >/dev/null 2>&1 || true
+docker compose $COMPOSE_FLAGS up -d --build --remove-orphans
 
 # --- Determine compose project name ---
 PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
@@ -90,7 +91,7 @@ sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
 
 # --- Recreate Suricata ---
 log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
-BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --force-recreate --no-deps suricata
+BRIDGE_IF="$BRIDGE_IF" docker compose $COMPOSE_FLAGS up -d --force-recreate --no-deps suricata
 
 # --- Wait for obfuscation proxies to be ready ---
 log "Waiting for UDP2RAW tunnels to initialize..."

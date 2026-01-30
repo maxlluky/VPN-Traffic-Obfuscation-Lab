@@ -18,7 +18,7 @@ services:
       - PEERDNS=1.1.1.1
       - ALLOWEDIPS=0.0.0.0/0
     volumes:
-      - ./services/gateway/wireguard:/config
+      - ../services/gateway/wireguard:/config
       - /lib/modules:/lib/modules:ro
     networks:
       internal_net:
@@ -32,7 +32,7 @@ services:
 
   obfs4-gateway:
     build:
-      context: ./services/obfs4
+      context: ../services/obfs4
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: obfs4-gateway
@@ -44,7 +44,7 @@ services:
       - TARGET_HOST=192.168.20.2
       - TARGET_PORT=51820
     volumes:
-      - ./services/obfs4/server:/config:ro
+      - ../services/obfs4/server:/config:ro
     networks:
       client_net:
         ipv4_address: 192.168.10.3
@@ -53,14 +53,14 @@ services:
 
   wg-client:
     build:
-      context: ./services/wg-client
+      context: ../services/wg-client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: wg-client
     cap_add:
       - NET_ADMIN
     volumes:
-      - ./services/wg-client/obfs4:/config:ro
+      - ../services/wg-client/obfs4:/config:ro
     networks:
       client_net:
         ipv4_address: 192.168.10.10
@@ -69,7 +69,7 @@ services:
 
   obfs4-client:
     build:
-      context: ./services/obfs4
+      context: ../services/obfs4
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: obfs4-client
@@ -81,12 +81,12 @@ services:
       - SERVER_PORT=${OBFS4_PORT:-12345}
       - TARGET_PORT=51820
     volumes:
-      - ./services/obfs4/client:/config:ro
+      - ../services/obfs4/client:/config:ro
     network_mode: "service:wg-client"
 
   client:
     build:
-      context: ./services/client
+      context: ../services/client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: client-node

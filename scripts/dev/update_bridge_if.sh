@@ -4,8 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
-COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose.yml}"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/compose/.env}"
+COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose/compose.yml}"
 
 # Which compose network key should Suricata sniff on?
 SNIFF_KEY="${SNIFF_KEY:-external_net}"  # external_net|client_net

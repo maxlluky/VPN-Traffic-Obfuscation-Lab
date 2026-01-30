@@ -18,7 +18,7 @@ services:
       - PEERDNS=1.1.1.1
       - ALLOWEDIPS=0.0.0.0/0
     volumes:
-      - ./services/gateway/wireguard:/config
+      - ../services/gateway/wireguard:/config
       - /lib/modules:/lib/modules:ro
     networks:
       client_net:
@@ -28,14 +28,14 @@ services:
 
   wg-client:
     build:
-      context: ./services/wg-client
+      context: ../services/wg-client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: wg-client
     cap_add:
       - NET_ADMIN
     volumes:
-      - ./services/wg-client/wireguard:/config:ro
+      - ../services/wg-client/wireguard:/config:ro
     networks:
       client_net:
         ipv4_address: 192.168.10.10
@@ -44,7 +44,7 @@ services:
 
   client:
     build:
-      context: ./services/client
+      context: ../services/client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: client-node

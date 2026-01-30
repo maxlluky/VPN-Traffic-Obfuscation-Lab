@@ -11,7 +11,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose/compose.yml}"
 
 # Which compose network key to sniff on: "external_net" or "client_net"
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
@@ -40,7 +40,7 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack ---
 log "Starting stack..."
-COMPOSE_FLAGS="-f $COMPOSE_FILE -f $REPO_ROOT/compose.baseline.yml"
+COMPOSE_FLAGS="--env-file $REPO_ROOT/compose/.env -f $COMPOSE_FILE -f $REPO_ROOT/compose/compose.baseline.yml"
 # Ensure clean slate
 docker compose $COMPOSE_FLAGS down --remove-orphans >/dev/null 2>&1 || true
 docker compose $COMPOSE_FLAGS up -d --build --remove-orphans
