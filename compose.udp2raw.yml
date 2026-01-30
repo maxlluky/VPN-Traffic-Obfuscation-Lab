@@ -21,10 +21,10 @@ services:
       - ./services/gateway/wireguard:/config
       - /lib/modules:/lib/modules:ro
     networks:
-      client_net:
-        ipv4_address: 192.168.10.2
       internal_net:
         ipv4_address: 192.168.20.2
+      external_net:
+        ipv4_address: 172.30.30.2
     expose:
       - "51820"
     depends_on:
@@ -44,8 +44,8 @@ services:
       - ./services/gateway/udp2raw/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /entrypoint.sh
     networks:
-      external_net:
-        ipv4_address: 172.30.30.2
+      client_net:
+        ipv4_address: 192.168.10.3
       internal_net:
         ipv4_address: 192.168.20.3
 

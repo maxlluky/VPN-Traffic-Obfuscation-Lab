@@ -72,3 +72,10 @@
 ### Fixed
 - Removed circular dependency in compose.udp2raw.yml and compose.obfs4.yml
   - `udp2raw-client` and `obfs4-client` now share network namespace without depends_on loops
+
+### Fixed (v2)
+- **Baseline Script Stability**
+  - Fixed `run_baseline.sh` hang by ensuring correct loading of base and override compose files (`-f compose.yml -f compose.baseline.yml`).
+  - Implemented robust container cleanup (`--remove-orphans`) in all run scripts to prevent "Address already in use" errors during scenario switching.
+  - Reverted `wg-client` Dockerfile to lightweight version (dependencies handled via sidecars).
+  - Standardized sniffing interface to `client_net` for consistent pre-NAT traffic capture across all scenarios.

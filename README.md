@@ -169,19 +169,21 @@ done
 ## Cleanup
 
 ### Stop current stack
+The run scripts automatically handle cleanup before starting a new run. However, to manually stop the stack and remove orphan containers (crucial when switching scenarios):
+
 ```bash
-docker compose -f compose.yml -f compose.baseline.yml down
+docker compose -f compose.yml -f compose.baseline.yml down --remove-orphans
 # or
-docker compose -f compose.yml -f compose.udp2raw.yml down
+docker compose -f compose.yml -f compose.udp2raw.yml down --remove-orphans
 # or
-docker compose -f compose.yml -f compose.obfs4.yml down
+docker compose -f compose.yml -f compose.obfs4.yml down --remove-orphans
 ```
 
 ### Remove all containers and networks
 ```bash
-docker compose -f compose.yml -f compose.baseline.yml down -v
-docker compose -f compose.yml -f compose.udp2raw.yml down -v
-docker compose -f compose.yml -f compose.obfs4.yml down -v
+docker compose -f compose.yml -f compose.baseline.yml down -v --remove-orphans
+docker compose -f compose.yml -f compose.udp2raw.yml down -v --remove-orphans
+docker compose -f compose.yml -f compose.obfs4.yml down -v --remove-orphans
 ```
 
 ### Clean experiment results (optional)

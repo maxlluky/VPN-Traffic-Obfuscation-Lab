@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
 COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose.yml}"
 COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose.udp2raw.yml}"
 
-SNIFF_KEY="${SNIFF_KEY:-external_net}"
+SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
 TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
 CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
@@ -40,7 +40,10 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack with udp2raw override ---
 log "Starting stack with UDP2RAW obfuscation..."
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --build
+docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" down --remove-orphans >/dev/null 2>&1 || true
+docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_OVERRIDE" up -d --build --remove-orphans
+
+
 
 # --- Determine compose project name ---
 PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
