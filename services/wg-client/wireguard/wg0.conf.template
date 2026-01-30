@@ -1,0 +1,9 @@
+[Interface]
+Address = 10.13.13.2
+PrivateKey = <YOUR_CLIENT_PRIVATE_KEY>
+
+[Peer]
+PublicKey = <SERVER_PUBLIC_KEY>
+PresharedKey = <PRE_SHARED_KEY>
+Endpoint = 192.168.10.2:51820
+AllowedIPs = 172.30.30.0/24
