@@ -16,7 +16,7 @@ COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose.baseline.yml}"
 COMPOSE_FLAGS="-f $COMPOSE_BASE -f $COMPOSE_OVERRIDE"
 
 # Which compose network key to sniff on: "external_net" or "client_net"
-SNIFF_KEY="${SNIFF_KEY:-external_net}"
+SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
 TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
 CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
@@ -107,8 +107,13 @@ sleep 1
 # --- Generate traffic ---
 log "Generating HTTP traffic ($HTTP_REQUESTS requests)..."
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
+  if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null"; then
+      log "WARNING: Request $i failed or timed out."
+  else
+      printf "."
+  fi
 done
+echo ""
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 

@@ -106,8 +106,15 @@ sleep 1
 # --- Generate traffic ---
 log "Generating HTTP traffic through UDP2RAW tunnel ($HTTP_REQUESTS requests)..."
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
+  # Add timeout to docker exec and curl
+  if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -v --max-time 5 http://$TARGET_IP:$TARGET_PORT/" >/dev/null 2>&1; then
+      log "WARNING: Request $i failed or timed out."
+  else
+      # Optional: progress indicator
+      printf "."
+  fi
 done
+echo "" # Newline after dots
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 
