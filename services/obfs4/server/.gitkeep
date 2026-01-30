@@ -1,0 +1,2 @@
+# obfs4 server configuration (gateway side)
+# Empty config - inherits environment variables from compose

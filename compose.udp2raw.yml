@@ -1,0 +1,97 @@
+# UDP2RAW obfuscation scenario: WireGuard traffic wrapped in TCP/443
+
+services:
+  gateway:
+    image: ${WIREGUARD_IMAGE}
+    container_name: vpn-gateway
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/London}
+      - SERVERPORT=${WG_SERVER_PORT:-51820}
+      - PEERS=${WG_PEER_NAME:-client1}
+      - PEERDNS=1.1.1.1
+      - ALLOWEDIPS=0.0.0.0/0
+    volumes:
+      - ./services/gateway/wireguard:/config
+      - /lib/modules:/lib/modules:ro
+    networks:
+      client_net:
+        ipv4_address: 192.168.10.2
+      internal_net:
+        ipv4_address: 192.168.20.2
+    expose:
+      - "51820"
+    depends_on:
+      - udp2raw-gateway
+
+  udp2raw-gateway:
+    image: ${UDP2RAW_IMAGE}
+    container_name: udp2raw-gateway
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - MODE=server
+      - LISTEN_PORT=${UDP2RAW_GATEWAY_PORT:-443}
+      - TARGET_HOST=gateway
+      - TARGET_PORT=51820
+    volumes:
+      - ./services/gateway/udp2raw/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: /entrypoint.sh
+    networks:
+      external_net:
+        ipv4_address: 172.30.30.2
+      internal_net:
+        ipv4_address: 192.168.20.3
+
+  wg-client:
+    build:
+      context: ./services/wg-client
+      args:
+        ALPINE_TAG: ${ALPINE_TAG}
+    container_name: wg-client
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./services/wg-client/udp2raw:/config:ro
+    networks:
+      client_net:
+        ipv4_address: 192.168.10.10
+    depends_on:
+      - udp2raw-gateway
+
+  udp2raw-client:
+    image: ${UDP2RAW_IMAGE}
+    container_name: udp2raw-client
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - MODE=client
+      - SERVER=udp2raw-gateway
+      - SERVER_PORT=${UDP2RAW_GATEWAY_PORT:-443}
+      - TARGET_PORT=51820
+    volumes:
+      - ./services/wg-client/udp2raw/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: /entrypoint.sh
+    network_mode: "service:wg-client"
+
+  client:
+    build:
+      context: ./services/client
+      args:
+        ALPINE_TAG: ${ALPINE_TAG}
+    container_name: client-node
+    network_mode: "service:wg-client"
+    command: ["sleep", "infinity"]
+
+networks:
+  internal_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.20.0/24

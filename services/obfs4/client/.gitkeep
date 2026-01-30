@@ -1,0 +1,2 @@
+# obfs4 client configuration (wg-client side)
+# Empty config - inherits environment variables from compose
