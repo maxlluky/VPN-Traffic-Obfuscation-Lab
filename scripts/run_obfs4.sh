@@ -2,17 +2,17 @@
 set -euo pipefail
 
 ###############################################################################
-# run_udp2raw.sh
-# - UDP2RAW obfuscation scenario (WireGuard tunneled through TCP/443)
+# run_obfs4.sh
+# - OBFS4 obfuscation scenario (WireGuard tunneled through obfs4)
 # - Captures traffic and Suricata alerts
 ###############################################################################
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Use both base and udp2raw compose files
+# Use both base and obfs4 compose files
 COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose/compose.yml}"
-COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose/compose.udp2raw.yml}"
+COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose/compose.obfs4.yml}"
 
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
 
@@ -23,13 +23,13 @@ HTTP_REQUESTS="${HTTP_REQUESTS:-50}"
 TCPDUMP_SECONDS_TAIL="${TCPDUMP_SECONDS_TAIL:-2}"
 
 TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
-RUN_DIR="$REPO_ROOT/results/runs/udp2raw/$TS"
+RUN_DIR="$REPO_ROOT/results/runs/obfs4/$TS"
 
 SURICATA_LOG_DIR="$REPO_ROOT/results/suricata-alerts"
 FAST_LOG="$SURICATA_LOG_DIR/fast.log"
 EVE_LOG="$SURICATA_LOG_DIR/eve.json"
 
-PCAP_FILE="$RUN_DIR/wg-udp2raw.pcap"
+PCAP_FILE="$RUN_DIR/wg-obfs4.pcap"
 
 log() { echo "[*] $*"; }
 die() { echo "[!] $*" >&2; exit 1; }
@@ -38,8 +38,8 @@ mkdir -p "$RUN_DIR" "$SURICATA_LOG_DIR"
 
 docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
-# --- Start stack with udp2raw override ---
-log "Starting stack with UDP2RAW obfuscation..."
+# --- Start stack with obfs4 override ---
+log "Starting stack with OBFS4 obfuscation..."
 COMPOSE_FLAGS="--env-file $REPO_ROOT/compose/.env -f $COMPOSE_BASE -f $COMPOSE_OVERRIDE"
 # Ensure clean slate
 docker compose $COMPOSE_FLAGS down --remove-orphans >/dev/null 2>&1 || true
@@ -82,7 +82,7 @@ TARGET_IP="$(docker inspect -f "{{with index .NetworkSettings.Networks \"$EXT_NE
 log "Bridge IF: $BRIDGE_IF"
 log "Target: $TARGET_CONTAINER => $TARGET_IP:$TARGET_PORT"
 log "Run directory: $RUN_DIR"
-log "UDP2RAW: WireGuard traffic wrapped in TCP/443"
+log "OBFS4: WireGuard traffic wrapped in obfs4 protocol"
 
 # --- Reset logs ---
 log "Resetting Suricata logs..."
@@ -94,17 +94,17 @@ log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
 BRIDGE_IF="$BRIDGE_IF" docker compose $COMPOSE_FLAGS up -d --force-recreate --no-deps suricata
 
 # --- Wait for obfuscation proxies to be ready ---
-log "Waiting for UDP2RAW tunnels to initialize..."
+log "Waiting for OBFS4 tunnels to initialize..."
 sleep 3
 
 # --- Capture traffic ---
-log "Starting tcpdump on $BRIDGE_IF (tcp/443 for udp2raw) -> $PCAP_FILE"
-sudo tcpdump -ni "$BRIDGE_IF" tcp port 443 -w "$PCAP_FILE" >/dev/null 2>&1 &
+log "Starting tcpdump on $BRIDGE_IF (tcp port ${OBFS4_PORT:-12345}) -> $PCAP_FILE"
+sudo tcpdump -ni "$BRIDGE_IF" tcp port "${OBFS4_PORT:-12345}" -w "$PCAP_FILE" >/dev/null 2>&1 &
 TCPDUMP_PID=$!
 sleep 1
 
 # --- Generate traffic ---
-log "Generating HTTP traffic through UDP2RAW tunnel ($HTTP_REQUESTS requests)..."
+log "Generating HTTP traffic through OBFS4 tunnel ($HTTP_REQUESTS requests)..."
 FAIL_COUNT=0
 for i in $(seq 1 "$HTTP_REQUESTS"); do
   if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null"; then

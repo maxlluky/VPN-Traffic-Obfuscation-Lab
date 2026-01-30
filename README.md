@@ -79,7 +79,7 @@ Edit `compose/.env` if required. Key variables:
 Run the baseline WireGuard experiment without obfuscation:
 
 ```bash
-bash scripts/runs/run_baseline.sh
+bash scripts/run_baseline.sh
 ```
 
 **What it does:**
@@ -101,7 +101,7 @@ results/runs/baseline/<timestamp>/
 Run the UDP2RAW obfuscation experiment (WireGuard wrapped in TCP/443):
 
 ```bash
-bash scripts/runs/run_udp2raw.sh
+bash scripts/run_udp2raw.sh
 ```
 
 **What it does:**
@@ -123,7 +123,7 @@ bash scripts/runs/run_udp2raw.sh
 Run the OBFS4 obfuscation experiment:
 
 ```bash
-bash scripts/runs/run_obfs4.sh
+bash scripts/run_obfs4.sh
 ```
 
 **What it does:**
@@ -261,10 +261,10 @@ target (172.30.30.10)
 ### Run with custom parameters
 ```bash
 # Generate 100 HTTP requests instead of 50
-HTTP_REQUESTS=100 bash scripts/runs/run_baseline.sh
+HTTP_REQUESTS=100 bash scripts/run_baseline.sh
 
 # Capture for longer (keep tcpdump running for 5 extra seconds after traffic)
-TCPDUMP_SECONDS_TAIL=5 bash scripts/runs/run_baseline.sh
+TCPDUMP_SECONDS_TAIL=5 bash scripts/run_baseline.sh
 ```
 
 ### Inspect container logs
@@ -298,7 +298,7 @@ If you see: `Bridge interface 'br-xxxx' not found on host`
 
 Run the experiment script again, or manually set `BRIDGE_IF`:
 ```bash
-BRIDGE_IF=br-a1b2c3d4e5f6 bash scripts/runs/run_baseline.sh
+BRIDGE_IF=br-a1b2c3d4e5f6 bash scripts/run_baseline.sh
 ```
 
 ### Suricata not starting
