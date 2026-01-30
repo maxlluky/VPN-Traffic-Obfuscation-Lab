@@ -1,33 +1,22 @@
 #!/bin/sh
 set -e
 
-# Default values
-PASSWORD="${PASSWORD:-vpn-lab-secret}"
-RAW_MODE="${RAW_MODE:-faketcp}"
-CIPHER_MODE="${CIPHER_MODE:-aes128cbc}"
-AUTH_MODE="${AUTH_MODE:-md5}"
+# udp2raw client entrypoint
+# Receives TCP/443 traffic and unwraps it as UDP/51820
 
-if [ "$MODE" = "client" ]; then
-    echo "[*] Starting UDP2RAW Client..."
-    
-    # Resolve hostname to IP
-    SERVER_IP=$(getent hosts "$SERVER" | awk '{ print $1 }' | head -n 1)
-    if [ -z "$SERVER_IP" ]; then
-        echo "[!] Could not resolve SERVER: $SERVER"
-        exit 1
-    fi
-    echo "    Server: ${SERVER} (${SERVER_IP}):${SERVER_PORT}"
-    echo "    Local Listen: 127.0.0.1:${TARGET_PORT}" # TARGET_PORT is used as local listen port here (51820)
-    
-    exec udp2raw -c \
-        -l "127.0.0.1:${TARGET_PORT}" \
-        -r "${SERVER_IP}:${SERVER_PORT}" \
-        -k "$PASSWORD" \
-        --raw-mode "$RAW_MODE" \
-        --cipher-mode "$CIPHER_MODE" \
-        --auth-mode "$AUTH_MODE" \
-        -a
-else
-    echo "[!] Invalid MODE: $MODE"
-    exit 1
-fi
+MODE="${MODE:-client}"
+SERVER="${SERVER:-udp2raw-gateway}"
+SERVER_PORT="${SERVER_PORT:-443}"
+TARGET_PORT="${TARGET_PORT:-51820}"
+
+echo "[*] udp2raw client ($MODE mode)"
+echo "[*] Connecting to $SERVER:$SERVER_PORT"
+echo "[*] Forwarding to localhost:$TARGET_PORT"
+
+# udp2raw client mode listens locally and sends to remote server
+exec udp2raw \
+  -c \
+  -l "127.0.0.1:$TARGET_PORT" \
+  -r "$SERVER:$SERVER_PORT" \
+  --raw-mode TCP \
+  -k "vpn-lab-obfs"

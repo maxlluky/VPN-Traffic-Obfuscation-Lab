@@ -1,33 +1,33 @@
 #!/bin/sh
 set -e
 
-# Default values
-PASSWORD="${PASSWORD:-vpn-lab-secret}"
-RAW_MODE="${RAW_MODE:-faketcp}"
-CIPHER_MODE="${CIPHER_MODE:-aes128cbc}"
-AUTH_MODE="${AUTH_MODE:-md5}"
+# udp2raw gateway entrypoint
+# Tunnels UDP/51820 (WireGuard) through TCP/443
+
+MODE="${MODE:-server}"
+LISTEN_PORT="${LISTEN_PORT:-443}"
+TARGET_HOST="${TARGET_HOST:-gateway}"
+TARGET_PORT="${TARGET_PORT:-51820}"
+
+echo "[*] udp2raw gateway ($MODE mode)"
+echo "[*] Listening on port $LISTEN_PORT"
+echo "[*] Forwarding to $TARGET_HOST:$TARGET_PORT"
+
+# udp2raw usage: udp2raw [-s server_mode] [-c client_mode] [-l listen_port] [-r remote_addr:remote_port] [-k password] [--raw-mode] [...]
+# For TCP wrapping: --raw-mode TCP
 
 if [ "$MODE" = "server" ]; then
-    echo "[*] Starting UDP2RAW Server..."
-    echo "    Listen: 0.0.0.0:${LISTEN_PORT}"
-    
-    # Resolve hostname to IP
-    TARGET_IP=$(getent hosts "$TARGET_HOST" | awk '{ print $1 }' | head -n 1)
-    if [ -z "$TARGET_IP" ]; then
-        echo "[!] Could not resolve TARGET_HOST: $TARGET_HOST"
-        exit 1
-    fi
-    echo "    Target: ${TARGET_HOST} (${TARGET_IP}):${TARGET_PORT}"
-
-    exec udp2raw -s \
-        -l "0.0.0.0:${LISTEN_PORT}" \
-        -r "${TARGET_IP}:${TARGET_PORT}" \
-        -k "$PASSWORD" \
-        --raw-mode "$RAW_MODE" \
-        --cipher-mode "$CIPHER_MODE" \
-        --auth-mode "$AUTH_MODE" \
-        -a
+  exec udp2raw \
+    -s \
+    -l "0.0.0.0:$LISTEN_PORT" \
+    -r "$TARGET_HOST:$TARGET_PORT" \
+    --raw-mode TCP \
+    -k "vpn-lab-obfs"
 else
-    echo "[!] Invalid MODE: $MODE"
-    exit 1
+  exec udp2raw \
+    -c \
+    -l "127.0.0.1:$TARGET_PORT" \
+    -r "$TARGET_HOST:$LISTEN_PORT" \
+    --raw-mode TCP \
+    -k "vpn-lab-obfs"
 fi

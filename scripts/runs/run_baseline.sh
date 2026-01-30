@@ -11,12 +11,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-COMPOSE_BASE="${COMPOSE_BASE:-$REPO_ROOT/compose.yml}"
-COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose.baseline.yml}"
-COMPOSE_FLAGS="-f $COMPOSE_BASE -f $COMPOSE_OVERRIDE"
+COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/compose.yml}"
 
 # Which compose network key to sniff on: "external_net" or "client_net"
-SNIFF_KEY="${SNIFF_KEY:-client_net}"
+SNIFF_KEY="${SNIFF_KEY:-external_net}"
 
 TARGET_CONTAINER="${TARGET_CONTAINER:-target-server}"
 CLIENT_CONTAINER="${CLIENT_CONTAINER:-client-node}"
@@ -42,11 +40,7 @@ docker ps >/dev/null 2>&1 || die "Docker daemon not accessible."
 
 # --- Start stack ---
 log "Starting stack..."
-# Ensure clean slate
-docker compose $COMPOSE_FLAGS down --remove-orphans >/dev/null 2>&1 || true
-docker compose $COMPOSE_FLAGS up -d --build --remove-orphans
-
-
+docker compose -f "$COMPOSE_FILE" up -d --build
 
 # --- Determine compose project name (reliable via container label) ---
 PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$TARGET_CONTAINER" 2>/dev/null || true)"
@@ -91,7 +85,7 @@ log "Run directory: $RUN_DIR"
 
 # --- Recreate Suricata to sniff on the chosen bridge ---
 log "Recreating Suricata (BRIDGE_IF=$BRIDGE_IF)..."
-BRIDGE_IF="$BRIDGE_IF" docker compose $COMPOSE_FLAGS up -d --force-recreate --no-deps suricata
+BRIDGE_IF="$BRIDGE_IF" docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps suricata
 
 # --- Reset logs ---
 log "Resetting Suricata logs..."
@@ -107,13 +101,8 @@ sleep 1
 # --- Generate traffic ---
 log "Generating HTTP traffic ($HTTP_REQUESTS requests)..."
 for i in $(seq 1 "$HTTP_REQUESTS"); do
-  if ! timeout 10s docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null"; then
-      log "WARNING: Request $i failed or timed out."
-  else
-      printf "."
-  fi
+  docker exec "$CLIENT_CONTAINER" sh -lc "curl -s --max-time 5 http://$TARGET_IP:$TARGET_PORT/ >/dev/null" || true
 done
-echo ""
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 
