@@ -27,8 +27,6 @@ services:
         ipv4_address: 172.30.30.2
     expose:
       - "51820"
-    depends_on:
-      - obfs4-gateway
 
   obfs4-gateway:
     build:
@@ -41,8 +39,6 @@ services:
     environment:
       - MODE=server
       - LISTEN_PORT=${OBFS4_PORT:-12345}
-      - TARGET_HOST=192.168.20.2
-      - TARGET_PORT=51820
     volumes:
       - ../services/obfs4/server:/config:ro
     networks:
@@ -79,6 +75,7 @@ services:
       - MODE=client
       - SERVER=192.168.10.3
       - SERVER_PORT=${OBFS4_PORT:-12345}
+      - TARGET_HOST=192.168.20.2
       - TARGET_PORT=51820
     volumes:
       - ../services/obfs4/client:/config:ro
