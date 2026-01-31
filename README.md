@@ -1,4 +1,6 @@
-<img src= docs/Logo.png? align="left" height="30" />
+<div align="center">
+    <img width="234" src="docs/Logo.png"/>
+</div>
 
 # VPN Obfuscation Lab (Bachelor Project)
 
