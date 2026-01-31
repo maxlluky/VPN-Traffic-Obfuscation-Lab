@@ -1,4 +1,10 @@
+<div align="center">
+    <img width="234" src="docs/Logo.png"/>
+</div>
+
 # VPN Obfuscation Lab (Bachelor Project)
+
+
 
 This repository contains a reproducible Docker-based testbed to evaluate the detectability of VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS.
 
@@ -81,18 +87,7 @@ After cloning, you must ensure that the WireGuard client configuration files exi
    cp services/wg-client/obfs4/wg0.conf.template services/wg-client/obfs4/wg0.conf
    ```
 
-2. **Generate Keys (if needed):**
-   If you don't have keys yet, you can generate them using the `wg-client` image:
-   ```bash
-   # Generate Private Key
-   docker run --rm --entrypoint wg vpn-lab-wg-client:latest genkey > private.key
-
-   # Generate Public Key from Private Key
-   docker run --rm --entrypoint wg -i vpn-lab-wg-client:latest pubkey < private.key > public.key
-   ```
-   *Note: Ensure you built the images first (e.g., by running a baseline test once).*
-
-3. **Fill in your keys:**
+2. **Fill in your keys:**
    Open each `wg0.conf` file and replace the placeholders (`<YOUR_CLIENT_PRIVATE_KEY>`, `<SERVER_PUBLIC_KEY>`, etc.) with the actual keys from your WireGuard server setup.
 
    *Note: Ensure `AllowedIPs` in the client configs matches the lab network (e.g., `172.30.30.0/24`) and the `Endpoint` points to the correct gateway (192.168.10.2:51820 for baseline) or the local tunnel (127.0.0.1:51820 for obfuscated scenarios).*
@@ -262,17 +257,11 @@ client-node (192.168.10.10)
     ↓
 wg-client (127.0.0.1:51820)
     ↓
-obfs4-client
-  1. sslocal (shadowsocks-rust) wraps UDP/51820 -> Encrypted Stream
-  2. pt_adapter.py (SIP003 Adapter) bridges Stream -> Obfs4
-  3. obfs4proxy wraps -> Obfs4 Protocol (TCP)
-    ↓
-[client_net] (192.168.10.3:12345)
-    ↓
-obfs4-gateway
-  1. obfs4proxy unwraps Obfs4 -> Encrypted Stream
-  2. pt_adapter.py bridges -> ssserver
-  3. ssserver unwraps -> UDP/51820
+obfs4-client (wraps UDP/51820 in OBFS4)
+    ↓ (OBFS4 protocol, TCP/${OBFS4_PORT})
+[external_net bridge]
+    ↓ (OBFS4 protocol)
+obfs4-gateway (unwraps OBFS4 → UDP/51820)
     ↓
 gateway (WireGuard UDP/51820)
     ↓
