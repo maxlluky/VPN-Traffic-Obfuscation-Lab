@@ -349,5 +349,35 @@ Please ensure:
 
 ---
 
+---
+
+## Future Work & Advanced Extensions
+
+### 1. Behavioral Analysis with Zeek
+While Suricata excels at signature-based detection, **Zeek** (formerly Bro) is recommended for analyzing traffic behavior and entropy.
+
+**Implementation Plan:**
+1.  **Add Zeek Service**: Add a Zeek container to `compose.yml` joined to `external_net`.
+2.  **Interface**: Configure Zeek to listen on the Docker bridge (similar to Suricata).
+3.  **Entropy Analysis**: Use Zeek scripts to calculate entropy of connections.
+    ```bash
+    # Example Zeek command to analyze a PCAP
+    zeek -r wg-obfs4.pcap local "Log::default_rotation_interval = 0"
+    ```
+4.  **Detection Logic**: High entropy (>7.5) combined with long session duration typically indicates encrypted tunnels.
+
+### 2. Mimicry Obfuscation (VLESS / Trojan)
+To defeat entropy-based detection, modern tools use "Mimicry" to look like valid HTTPS traffic.
+
+**Proposed Architecture:**
+1.  **Tools**: Replace `obfs4proxy` with **Xray-core** (supporting VLESS-XTLS-uTLS-REALITY).
+2.  **Flow**:
+    *   **Client**: Uses `uTLS` to mimic a specific browser (e.g., Chrome) Client Hello.
+    *   **Server**: Listens on port 443.
+    *   **Fallback**: If packet looks like valid/innocent HTTPS, forward to a real Nginx web server. If it matches the VLESS signature, decapsulate to WireGuard.
+3.  **Benefit**: Active probing by censors will receive a valid website response, while Obfs4 would drop the connection or timeout.
+
+---
+
 ## License & Citation
 [Insert license and citation information here]
