@@ -458,20 +458,16 @@ Please ensure:
 ## Future Work & Advanced Extensions
 
 ### 1. Behavior-Based Detection (Machine Learning)
-*Note: This is an outlook for future research and not part of the current Bachelor thesis.*
+*Note: The findings of this analysis point towards the necessity of Machine Learning for detecting obfuscated flows. This section discusses the theoretical application of such methods as a countermeasure.*
 
-While the current work covers **Feature Engineering** (Entropy, IAT), a logical next step for follow-up projects would be to train **Machine Learning models** (Random Forest, SVM) on these extracted features to classify traffic automatically.
+While the current work covers **Feature Engineering** (Entropy, IAT), a logical extension is the application of **Machine Learning models** (Random Forest, SVM, CNN) trained on these extracted features.
 
-### 2. Mimicry Obfuscation (VLESS / Trojan)
-To defeat entropy-based detection, modern tools use "Mimicry" to look like valid HTTPS traffic.
+**Theoretical Approach:**
+- **Feature Extraction:** Use flow-level features (duration, packet counts, bytes) and time-series data (inter-arrival times) identified in this lab.
+- **Classification:** Train models to distinguish between "Web Browsing" and "Obfuscated VPN" based on the statistical anomalies preserved by the obfuscation tools (e.g., specific burst patterns in UDP2RAW).
+- **Goal:** To overcome the limitations of signature-based detection (Suricata) demonstrated in this project.
 
-**Proposed Architecture:**
-1.  **Tools**: Replace `obfs4proxy` with **Xray-core** (supporting VLESS-XTLS-uTLS-REALITY).
-2.  **Flow**:
-    *   **Client**: Uses `uTLS` to mimic a specific browser (e.g., Chrome) Client Hello.
-    *   **Server**: Listens on port 443.
-    *   **Fallback**: If packet looks like valid/innocent HTTPS, forward to a real Nginx web server. If it matches the VLESS signature, decapsulate to WireGuard.
-3.  **Benefit**: Active probing by censors will receive a valid website response, while Obfs4 would drop the connection or timeout.
+
 
 ---
 
