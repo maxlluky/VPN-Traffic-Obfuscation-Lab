@@ -51,3 +51,17 @@
 - **Reliability & Logging**
   - Fixed empty Suricata logs by disabling checksum validation.
   - Improved log rotation and added a fail-fast mechanism to scripts.
+
+## 2026-02-01
+### Fixed
+- **Configuration & Secrets**
+    - Corrected WireGuard client configurations (`wg0.conf`) with keys matching the server.
+    - Updated `.gitignore` to track `wg0.conf` files for easier lab setup.
+    - Updated `README.md` to remove manual template copying steps and add `tcpdump` requirement.
+- **UDP2RAW Build**
+    - Added missing `Dockerfile` for `services/udp2raw` to build from source (using `wget` instead of `git` to avoid auth issues).
+    - Corrected build URL to `wangyu-/udp2raw` (tag `20230206.0`).
+    - Updated `compose.udp2raw.yml` to use local build context.
+- **Experiment Execution**
+    - Fixed missing PCAP files by installing `tcpdump` on the host system.
+    - Verified all scenarios (Baseline, UDP2RAW, OBFS4) run successfully.

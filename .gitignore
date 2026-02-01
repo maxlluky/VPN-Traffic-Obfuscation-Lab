@@ -4,8 +4,11 @@
 # Ignore all generated WireGuard state (keys, configs, QR codes, etc.)
 services/**/wireguard/**
 !services/**/wireguard/**/*.template
+!services/**/wireguard/**/wg0.conf
 !services/**/udp2raw/**/*.template
+!services/**/udp2raw/**/wg0.conf
 !services/**/obfs4/**/*.template
+!services/**/obfs4/**/wg0.conf
 
 # Keep init scripts tracked
 !services/gateway/wireguard/custom-cont-init.d/

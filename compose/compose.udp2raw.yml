@@ -31,6 +31,10 @@ services:
       - udp2raw-gateway
 
   udp2raw-gateway:
+    build:
+      context: ../services/udp2raw
+      args:
+        ALPINE_TAG: ${ALPINE_TAG}
     image: ${UDP2RAW_IMAGE}
     container_name: udp2raw-gateway
     cap_add:
@@ -66,6 +70,10 @@ services:
       - udp2raw-gateway
 
   udp2raw-client:
+    build:
+      context: ../services/udp2raw
+      args:
+        ALPINE_TAG: ${ALPINE_TAG}
     image: ${UDP2RAW_IMAGE}
     container_name: udp2raw-client
     cap_add:
@@ -87,7 +95,7 @@ services:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: client-node
     network_mode: "service:wg-client"
-    command: ["sleep", "infinity"]
+    command: [ "sleep", "infinity" ]
 
 networks:
   internal_net:

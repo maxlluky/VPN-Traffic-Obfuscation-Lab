@@ -49,7 +49,15 @@ results/
 2. Docker Engine ≥ 24.x
 3. Docker Compose v2
 4. Kernel support for WireGuard (`wireguard`, `udp_tunnel`)
-5. `bash`, `tcpdump` (for packet capture)
+
+5. `bash`, `tcpdump` (required for packet capture on the host)
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install tcpdump
+   
+   # Arch Linux
+   sudo pacman -S tcpdump
+   ```
 
 **Verify Docker:**
 ```bash
@@ -75,8 +83,9 @@ Edit `compose/.env` if required. Key variables:
 > ⚠️ Do not commit `compose/.env` — it may contain system-specific configuration.
 
 ### 3️⃣ Setup WireGuard Configurations
-After cloning, you must ensure that the WireGuard client configuration files exist. We provide templates that you can copy and fill with your keys.
+**Note:** The `wg0.conf` configuration files are now included in the repository for the lab environment. You generally **do not** need to copy templates unless you want to generate new keys.
 
+If you *do* need to reset keys:
 1. **Copy the templates:**
    ```bash
    cp services/wg-client/wireguard/wg0.conf.template services/wg-client/wireguard/wg0.conf
