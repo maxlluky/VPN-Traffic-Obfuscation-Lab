@@ -49,3 +49,14 @@ build/
 .DS_Store
 *.swp
 *.swo
+
+############################
+# Python & Analysis
+############################
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.venv/
+env/
+analysis/*.csv
+analysis/*.png

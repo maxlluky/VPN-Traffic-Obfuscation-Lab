@@ -5,7 +5,26 @@
 # VPN Obfuscation Lab (Bachelor Project)
 This repository contains a reproducible Docker-based testbed to evaluate the detectability of VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS.
 
+
+### Author Information
+**Max Luckert**
+- **University:** Wrexham University
+- **Student ID:** S24014929
+- **Email:** [S24014929@mail.glyndwr.ac.uk](mailto:S24014929@mail.glyndwr.ac.uk) | [mluckert@outlook.de](mailto:mluckert@outlook.de)
+
 ---
+
+## Table of Contents
+1. [Project Structure](#project-structure)
+2. [Quickstart](#quickstart)
+3. [Scenarios](#scenarios)
+4. [Inspecting Results](#inspecting-results)
+5. [Architecture](#architecture)
+6. [Future Work](#future-work--advanced-extensions)
+7. [License & Copyright](#license--citation)
+
+---
+
 
 ## Project Structure
 
@@ -18,7 +37,7 @@ The project uses **multiple compose files** for clarity and modularity, located 
 - `compose/compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped in obfs4 protocol
 
 ### Services Directory
-```
+```text
 services/
 ├── client/              – Traffic generator (curl, iperf)
 ├── gateway/wireguard/   – WireGuard server config
@@ -31,9 +50,10 @@ services/
 ```
 
 ### Results & Artifacts
-```
+```text
 results/
 ├── suricata-alerts/    – IDS outputs (eve.json, fast.log)
+├── zeek-logs/          – Zeek logs (conn.log, dns.log, etc.)
 └── runs/
     ├── baseline/       – Baseline experiment results
     ├── udp2raw/        – UDP2RAW experiment results
@@ -100,6 +120,21 @@ If you *do* need to reset keys:
 
 ---
 
+## Traffic Modes
+The experiment scripts support two traffic generation modes, controlled via the `TRAFFIC_MODE` environment variable:
+
+*   **Burst Mode (Default):** Generates 50 sequential HTTP requests (simulating web measurement). Good for testing connectivity and quick alert generation.
+*   **Streaming Mode:** Generates a continuous TCP stream for 60 seconds using `iperf3`. Essential for **Long Flow** analysis (Zeek) and connection duration metrics.
+
+**Usage:**
+```bash
+# Default (Burst)
+bash scripts/run_baseline.sh
+
+# Streaming (Recommended for Analysis)
+TRAFFIC_MODE=streaming bash scripts/run_baseline.sh
+```
+
 ## Scenarios
 
 ### Scenario 1: Baseline (Plain WireGuard)
@@ -117,11 +152,16 @@ bash scripts/run_baseline.sh
 - Stores artifacts in `results/runs/baseline/<timestamp>/`
 
 **Output files:**
-```
-results/runs/baseline/<timestamp>/
-├── wg-baseline.pcap      – Captured WireGuard packets (tcpdump)
-├── eve.json              – Suricata alerts (JSON format)
-└── fast.log              – Suricata alerts (text format)
+```text
+results/runs/baseline/<dd-mm-yyyy-hh-mm-ss>/
+├── pcap/
+│   └── wg-baseline.pcap  – Captured traffic
+├── suricata/
+│   ├── eve.json          – Suricata alerts (JSON)
+│   └── fast.log          – Suricata alerts (Text)
+└── zeek/
+    ├── conn.log          – Connection logs
+    └── ...
 ```
 
 ### Scenario 2: UDP2RAW Obfuscation
@@ -142,7 +182,7 @@ bash scripts/run_udp2raw.sh
 - Stores artifacts in `results/runs/udp2raw/<timestamp>/`
 
 **Network topology:**
-```
+```text
 [client-node] → [udp2raw-client] → (TCP/443) → [udp2raw-gateway] → [gateway/WireGuard]
 ```
 
@@ -193,6 +233,53 @@ done
 
 ---
 
+---
+
+## Analysis Guide for Bachelor Thesis
+To provide technical depth, focus on **Feature Engineering** using the generated artifacts:
+
+**1. Signature-Based Detection (Suricata)**
+- **Metric:** Alert Count & Signature ID.
+- **Hypothesis:** Baseline triggers WireGuard signatures; Obfuscated scenarios trigger 0 alerts or generic "TCP" alerts.
+- **File:** `suricata/eve.json`
+- **Key Fields:** `alert.signature`, `alert.category`, `payload_printable`.
+
+**2. Flow Analysis (Zeek)**
+- **Metric:** Flow Duration, Bytes Transferred (Ratio), inter-arrival times.
+- **Hypothesis:** VPN tunnels show long durations and high byte counts compared to normal web browsing.
+- **File:** `zeek/conn.log`
+- **Key Fields:**
+    - `id.orig_h` / `id.resp_h`: Source/Dest IP.
+    - `proto`: Protocol (UDP for WireGuard, TCP for obfuscation).
+    - `service`: Detected application (e.g., "ssl", "http", or "-").
+    - `orig_bytes` / `resp_bytes`: Volume of data (Tunneling = high volume).
+    - `duration`: Length of connection.
+
+**3. Entropy & Payload Analysis (PCAP)**
+- **Metric:** Shannon Entropy of payload bytes.
+- **Hypothesis:** Encrypted WireGuard traffic has high entropy (close to 8.0). Obfuscated traffic (like obfs4) also has high entropy but attempts to look random.
+- **Tooling:** Use python `scapy` or `pandas` to calculate entropy on `pcap/` files.
+
+## 4. Analysis Implementation (Jupyter Notebook)
+To perform the analysis described above, use the provided Jupyter Notebook template:
+
+### 1. Requirements
+Install the necessary python libraries:
+```bash
+pip install -r analysis/requirements.txt
+```
+
+### 2. Running the Analysis
+OPEN the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
+The notebook performs the following:
+1.  **Loads Data:** Automatically discovers the latest runs in `results/runs/`.
+2.  **Suricata Plots:** Visualizes alert counts per scenario (to show efficacy of obfuscation).
+3.  **Zeek Flows:** Scans `conn.log` to identify tunnel characteristics (Duration vs Bytes).
+4.  **Entropy Calculation:** Parses `.pcap` files payload to compute Shannon Entropy.
+5.  **Packet Timing:** Analyzes Inter-Arrival Time (IAT) distribution on a logarithmic scale to detect machine-generated traffic patterns.
+
+---
+
 ## Cleanup
 
 ### Stop current stack
@@ -230,7 +317,7 @@ The testbed uses two isolated Docker networks:
 - **`internal_net` (192.168.20.0/24)** – Internal network for obfuscation proxies (UDP2RAW & OBFS4 only)
 
 ### Traffic Flow: Baseline
-```
+```text
 client-node (192.168.10.10)
     ↓
 wg-client (WireGuard UDP/51820)
@@ -241,7 +328,7 @@ target (172.30.30.10)
 ```
 
 ### Traffic Flow: UDP2RAW
-```
+```text
 client-node (192.168.10.10)
     ↓
 wg-client (127.0.0.1:51820)
@@ -258,7 +345,7 @@ target (172.30.30.10)
 ```
 
 ### Traffic Flow: OBFS4
-```
+```text
 client-node (192.168.10.10)
     ↓
 wg-client (127.0.0.1:51820)
@@ -279,6 +366,7 @@ target (172.30.30.10)
 - **Identical client-node** across all scenarios guarantees the same application traffic
 - **Automatic bridge detection** eliminates hardcoded interface names
 - **Passive Suricata IDS** captures traffic on the external_net bridge
+- **Zeek NSM** captures behavioral data (conn.log, etc.) on the external_net bridge
 - **tcpdump** captures raw packets independently of Suricata
 
 ---
@@ -390,3 +478,9 @@ To defeat entropy-based detection, modern tools use "Mimicry" to look like valid
 
 ## License & Citation
 [Insert license and citation information here]
+
+## Copyright
+The contents and works in this software created by the software operators are subject to German copyright law. The reproduction, editing, distribution and any kind of use outside the limits of copyright law require the written consent of the respective author or creator. Downloads and copies of this software are only permitted for private, non-commercial use.
+
+Insofar as the content on this software was not created by the operator, the copyrights of third parties are observed. In particular, third-party content is identified as such. Should you nevertheless become aware of a copyright infringement, please inform us accordingly. If we become aware of any infringements, we will remove such contents immediately.
+Source: [eRecht24.de](https://www.e-recht24.de/)

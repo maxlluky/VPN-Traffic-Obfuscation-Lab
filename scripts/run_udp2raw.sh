@@ -8,7 +8,7 @@ setup_common_vars
 
 # Specific Config
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
-TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+TS="$(date -u +"%d-%m-%Y-%H-%M-%S")"
 RUN_DIR="$REPO_ROOT/results/runs/udp2raw/$TS"
 PCAP_FILE="$RUN_DIR/wg-udp2raw.pcap"
 
@@ -24,7 +24,7 @@ log "UDP2RAW: WireGuard traffic wrapped in TCP/443"
 start_stack "$COMPOSE_FLAGS"
 detect_network_info "$TARGET_CONTAINER" "$SNIFF_KEY"
 
-reset_suricata_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
+reset_ids_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
 
 log "Waiting for UDP2RAW tunnels to initialize..."
 sleep 3

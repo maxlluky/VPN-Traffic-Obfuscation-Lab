@@ -8,7 +8,7 @@ setup_common_vars
 
 # Specific Config
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
-TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+TS="$(date -u +"%d-%m-%Y-%H-%M-%S")"
 RUN_DIR="$REPO_ROOT/results/runs/baseline/$TS"
 PCAP_FILE="$RUN_DIR/wg-baseline.pcap"
 
@@ -22,7 +22,7 @@ log "Run directory: $RUN_DIR"
 start_stack "$COMPOSE_FLAGS"
 detect_network_info "$TARGET_CONTAINER" "$SNIFF_KEY"
 
-reset_suricata_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
+reset_ids_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
 
 # Capture WG UDP/51820
 start_tcpdump "$BRIDGE_IF" "udp port 51820" "$PCAP_FILE"

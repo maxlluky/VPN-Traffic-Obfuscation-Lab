@@ -65,3 +65,21 @@
 - **Experiment Execution**
     - Fixed missing PCAP files by installing `tcpdump` on the host system.
     - Verified all scenarios (Baseline, UDP2RAW, OBFS4) run successfully.
+
+### Added
+- **Network Security Monitoring (Zeek)**
+    - Integrated Zeek IDS container (`network_mode: host`) to capture flow logs (`conn.log`, `dns.log`, etc.).
+    - Configured automatic log collection into `results/runs/<timestamp>/zeek/`.
+- **Enhanced Result Structure**
+    - Refactored experiment results to use subdirectories: `pcap/`, `suricata/`, `zeek/`.
+    - Changed timestamp format to `DD-MM-YYYY-HH-MM-SS` for better readability.
+    - Updated `README.md` with Analysis Guide and Author Information.
+- **Traffic Generation Modes**
+    - Implemented `TRAFFIC_MODE` support (Burst vs Streaming).
+    - Integrated `iperf3` for generating long-duration TCP flows (essential for flow analysis).
+    - Added visual progress bar for real-time feedback during experiments.
+- **Analysis Environment**
+    - Debugged and enhanced `Analysis_Starter.ipynb` (Fixed Zeek log parsing for empty/short streams).
+    - **Fixed Suricata Parser:** Correctly extracts `dest_port` and `proto` from EVE JSON logs (often located in root object).
+    - **Improved Visualization:** Switched Packet IAT (Inter-Arrival Time) plots to Logarithmic Scale for better visibility of high-speed `iperf3` characteristics.
+    - Added Entropy and Advanced DPI metrics.

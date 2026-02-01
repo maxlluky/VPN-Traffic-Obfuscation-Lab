@@ -10,6 +10,8 @@ services:
     networks:
       external_net:
         ipv4_address: 172.30.30.10
+    # Install iperf3 and run it in background, then start nginx
+    entrypoint: /bin/sh -c "apk add --no-cache iperf3 && iperf3 -s -D && nginx -g 'daemon off;'"
 
   suricata:
     image: ${SURICATA_IMAGE}
@@ -23,7 +25,19 @@ services:
       - ../services/suricata/suricata.yaml:/etc/suricata/suricata.yaml
       - ../services/suricata/rules:/var/lib/suricata/rules
       - ../results/suricata-alerts:/var/log/suricata
-    command: ["-i", "${BRIDGE_IF}", "-l", "/var/log/suricata", "-c", "/etc/suricata/suricata.yaml"]
+    command: [ "-i", "${BRIDGE_IF}", "-l", "/var/log/suricata", "-c", "/etc/suricata/suricata.yaml" ]
+
+  zeek:
+    image: ${ZEEK_IMAGE}
+    container_name: zeek-nsm
+    network_mode: host
+    working_dir: /var/log/zeek
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ../results/zeek-logs:/var/log/zeek
+    command: [ "zeek", "-C", "-i", "${BRIDGE_IF}", "local" ]
 
 networks:
   client_net:

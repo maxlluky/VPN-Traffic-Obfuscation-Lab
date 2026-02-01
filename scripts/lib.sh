@@ -31,10 +31,11 @@ setup_common_vars() {
     
     # Logs
     SURICATA_LOG_DIR="$REPO_ROOT/results/suricata-alerts"
+    ZEEK_LOG_DIR="$REPO_ROOT/results/zeek-logs"
     FAST_LOG="$SURICATA_LOG_DIR/fast.log"
     EVE_LOG="$SURICATA_LOG_DIR/eve.json"
     
-    mkdir -p "$SURICATA_LOG_DIR"
+    mkdir -p "$SURICATA_LOG_DIR" "$ZEEK_LOG_DIR"
 }
 
 check_docker() {
@@ -101,16 +102,17 @@ detect_network_info() {
 #######################################
 # Suricata Logic
 #######################################
-reset_suricata_logs() {
+reset_ids_logs() {
     local bridge_if="$1"
     local compose_flags="$2"
     
-    log "Resetting Suricata logs..."
+    log "Resetting Suricata & Zeek logs..."
     sudo -v
     sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
+    sudo rm -f "$ZEEK_LOG_DIR"/*.log
 
-    log "Recreating Suricata (BRIDGE_IF=$bridge_if)..."
-    BRIDGE_IF="$bridge_if" docker compose $compose_flags up -d --force-recreate --no-deps suricata
+    log "Recreating IDS services (BRIDGE_IF=$bridge_if)..."
+    BRIDGE_IF="$bridge_if" docker compose $compose_flags up -d --force-recreate --no-deps suricata zeek
 }
 
 #######################################
@@ -143,21 +145,62 @@ generate_traffic() {
     local target_port="$3"
     local count="$4"
     
-    log "Generating HTTP traffic ($count requests)..."
-    FAIL_COUNT=0
-    for i in $(seq 1 "$count"); do
-      if ! timeout 10s docker exec "$client_container" sh -lc "curl -s --max-time 5 http://$target_ip:$target_port/ >/dev/null"; then
-          log "WARNING: Request $i failed or timed out."
-          FAIL_COUNT=$((FAIL_COUNT+1))
-          if [ "$FAIL_COUNT" -ge 10 ]; then
-            die "Aborting: 10 consecutive failures detected."
+    # Traffic Mode Defaults
+    TRAFFIC_MODE="${TRAFFIC_MODE:-burst}"   # burst | streaming
+    STREAM_DURATION="${STREAM_DURATION:-60}" # seconds for streaming
+    
+    log "Generating traffic (Mode: $TRAFFIC_MODE)..."
+
+    if [ "$TRAFFIC_MODE" == "streaming" ]; then
+        log "Streaming mode: Running iperf3 for $STREAM_DURATION seconds..."
+        
+        # Run iperf3 client
+        # -c target_ip: connect to target
+        # -t duration: run for X seconds
+        # -p 5201: default iperf3 port
+        if ! docker exec "$client_container" iperf3 -c "$target_ip" -t "$STREAM_DURATION" >/dev/null & then
+             IPERF_PID=$!
+             
+             # Progress bar
+             for i in $(seq 1 "$STREAM_DURATION"); do
+                 # Calculate progress
+                 perc=$((i * 100 / STREAM_DURATION))
+                 filled=$((perc / 2))
+                 bar=$(printf "%-${filled}s" "#" | sed 's/ /#/g')
+                 printf "\r[*] Streaming: [%-50s] %d/%ds (%d%%)" "$bar" "$i" "$STREAM_DURATION" "$perc"
+                 sleep 1
+             done
+             echo ""
+             wait "$IPERF_PID" 2>/dev/null || true
+        else
+             log "WARNING: Failed to start iperf3."
+             sleep "$STREAM_DURATION"
+        fi
+    else
+        # Burst Mode (Default)
+        log "Burst mode: $count requests..."
+        FAIL_COUNT=0
+        for i in $(seq 1 "$count"); do
+          if ! timeout 10s docker exec "$client_container" sh -lc "curl -s --max-time 5 http://$target_ip:$target_port/ >/dev/null"; then
+              log "WARNING: Request $i failed or timed out."
+              FAIL_COUNT=$((FAIL_COUNT+1))
+              if [ "$FAIL_COUNT" -ge 10 ]; then
+                die "Aborting: 10 consecutive failures detected."
+              fi
+          else
+              # Progress bar calculation
+              perc=$((i * 100 / count))
+              filled=$((perc / 2))
+              bar=$(printf "%-${filled}s" "#" | sed 's/ /#/g')
+              printf "\r[*] Generating: [%-50s] %d/%d reqs (%d%%)" "$bar" "$i" "$count" "$perc"
+              FAIL_COUNT=0
           fi
-      else
-          printf "."
-          FAIL_COUNT=0
-      fi
-    done
-    echo ""
+        done
+        echo ""
+    fi
+    
+    log "Waiting 5 seconds for logs to flush..."
+    sleep 5
 }
 
 #######################################
@@ -167,13 +210,26 @@ collect_artifacts() {
     local run_dir="$1"
     local pcap_file="$2"
     
-    log "Copying Suricata logs..."
-    sudo cp "$FAST_LOG" "$run_dir/fast.log" 2>/dev/null || cp "$FAST_LOG" "$run_dir/fast.log"
-    sudo cp "$EVE_LOG"  "$run_dir/eve.json" 2>/dev/null || cp "$EVE_LOG"  "$run_dir/eve.json"
+    log "Organizing artifacts..."
     
-    log "Artifacts created:"
-    ls -lah "$run_dir" | sed 's/^/    /'
+    # Create subdirectories
+    mkdir -p "$run_dir/pcap" "$run_dir/suricata" "$run_dir/zeek"
     
-    log "Sanity checks (bytes):"
-    ( sudo wc -c "$pcap_file" "$run_dir/eve.json" "$run_dir/fast.log" 2>/dev/null || true ) | sed 's/^/    /'
+    # Move PCAP
+    if [ -f "$pcap_file" ]; then
+        mv "$pcap_file" "$run_dir/pcap/"
+        if [ -f "${pcap_file}.log" ]; then
+            mv "${pcap_file}.log" "$run_dir/pcap/"
+        fi
+    fi
+
+    # Copy Suricata logs
+    sudo cp "$FAST_LOG" "$run_dir/suricata/fast.log" 2>/dev/null || cp "$FAST_LOG" "$run_dir/suricata/fast.log"
+    sudo cp "$EVE_LOG"  "$run_dir/suricata/eve.json" 2>/dev/null || cp "$EVE_LOG"  "$run_dir/suricata/eve.json"
+    
+    # Copy Zeek logs
+    sudo cp "$ZEEK_LOG_DIR"/*.log "$run_dir/zeek/" 2>/dev/null || true
+    
+    log "Artifacts created in $run_dir:"
+    ls -R "$run_dir" | sed 's/^/    /'
 }

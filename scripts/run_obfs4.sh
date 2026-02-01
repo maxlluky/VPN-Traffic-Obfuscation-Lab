@@ -8,7 +8,7 @@ setup_common_vars
 
 # Specific Config
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
-TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+TS="$(date -u +"%d-%m-%Y-%H-%M-%S")"
 RUN_DIR="$REPO_ROOT/results/runs/obfs4/$TS"
 PCAP_FILE="$RUN_DIR/wg-obfs4.pcap"
 
@@ -26,7 +26,7 @@ log "OBFS4: WireGuard traffic wrapped in obfs4 protocol"
 start_stack "$COMPOSE_FLAGS"
 detect_network_info "$TARGET_CONTAINER" "$SNIFF_KEY"
 
-reset_suricata_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
+reset_ids_logs "$BRIDGE_IF" "$COMPOSE_FLAGS"
 
 log "Waiting for OBFS4 tunnels to initialize..."
 sleep 3
