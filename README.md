@@ -58,6 +58,12 @@ results/
     ├── baseline/       – Baseline experiment results
     ├── udp2raw/        – UDP2RAW experiment results
     └── obfs4/          – OBFS4 experiment results
+
+### Analysis Tools (`analysis/`)
+Contains Python notebooks for deep traffic inspection:
+- `analysis/Analysis_Starter.ipynb` – Main Jupyter Notebook for parsing PCAPs and generating plots.
+- `analysis/requirements.txt` – Python dependencies for the analysis environment.
+
 ```
 
 ---
@@ -437,7 +443,10 @@ Ensure `BRIDGE_IF` is set correctly in `.env`.
 ---
 
 ## Contributing
-This is a Bachelor project. Contributions are welcome! 
+This is a Bachelor project. **Contributions are currently NOT accepted.**
+Please do not open Pull Requests until the project is officially marked as completed (expected: May 2026).
+
+Once the project is finished, contributions will be welcome!
 
 Please ensure:
 - Scripts are POSIX-compliant
@@ -446,22 +455,12 @@ Please ensure:
 
 ---
 
----
-
 ## Future Work & Advanced Extensions
 
-### 1. Behavioral Analysis with Zeek
-While Suricata excels at signature-based detection, **Zeek** (formerly Bro) is recommended for analyzing traffic behavior and entropy.
+### 1. Behavior-Based Detection (Machine Learning)
+*Note: This is an outlook for future research and not part of the current Bachelor thesis.*
 
-**Implementation Plan:**
-1.  **Add Zeek Service**: Add a Zeek container to `compose.yml` joined to `external_net`.
-2.  **Interface**: Configure Zeek to listen on the Docker bridge (similar to Suricata).
-3.  **Entropy Analysis**: Use Zeek scripts to calculate entropy of connections.
-    ```bash
-    # Example Zeek command to analyze a PCAP
-    zeek -r wg-obfs4.pcap local "Log::default_rotation_interval = 0"
-    ```
-4.  **Detection Logic**: High entropy (>7.5) combined with long session duration typically indicates encrypted tunnels.
+While the current work covers **Feature Engineering** (Entropy, IAT), a logical next step for follow-up projects would be to train **Machine Learning models** (Random Forest, SVM) on these extracted features to classify traffic automatically.
 
 ### 2. Mimicry Obfuscation (VLESS / Trojan)
 To defeat entropy-based detection, modern tools use "Mimicry" to look like valid HTTPS traffic.
@@ -475,9 +474,6 @@ To defeat entropy-based detection, modern tools use "Mimicry" to look like valid
 3.  **Benefit**: Active probing by censors will receive a valid website response, while Obfs4 would drop the connection or timeout.
 
 ---
-
-## License & Citation
-[Insert license and citation information here]
 
 ## Copyright
 The contents and works in this software created by the software operators are subject to German copyright law. The reproduction, editing, distribution and any kind of use outside the limits of copyright law require the written consent of the respective author or creator. Downloads and copies of this software are only permitted for private, non-commercial use.
