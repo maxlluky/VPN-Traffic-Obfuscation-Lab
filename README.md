@@ -21,7 +21,7 @@ This repository contains a reproducible Docker-based testbed to evaluate the det
 4. [Inspecting Results](#inspecting-results)
 5. [Architecture](#architecture)
 6. [Future Work](#future-work--advanced-extensions)
-7. [License & Copyright](#license--citation)
+7. [License & Copyright](#copyright)
 
 ---
 
@@ -39,32 +39,43 @@ The project uses **multiple compose files** for clarity and modularity, located 
 ### Services Directory
 ```text
 services/
-├── client/              – Traffic generator (curl, iperf)
-├── gateway/wireguard/   – WireGuard server config
-├── gateway/udp2raw/     – UDP2RAW gateway config (server-side unwrapper)
-├── wg-client/wireguard/ – WireGuard client config (baseline)
-├── wg-client/udp2raw/   – WireGuard client config (UDP2RAW scenario)
-├── wg-client/obfs4/     – WireGuard client config (OBFS4 scenario)
+├── client/              – Traffic generator (Python script, curl, iperf)
+├── gateway/
+│   ├── wireguard/       – WireGuard server config (Baseline, Standard MTU)
+│   ├── udp2raw/         – WireGuard server config (UDP2RAW scenario, Low MTU) + Sidecar entrypoint.sh
+│   └── obfs4/           – WireGuard server config (OBFS4 scenario, Low MTU)
+├── wg-client/
+│   ├── wireguard/       – WireGuard client config (Baseline)
+│   ├── udp2raw/         – WireGuard client config (UDP2RAW scenario)
+│   └── obfs4/           – WireGuard client config (OBFS4 scenario)
+├── udp2raw/             – UDP2RAW Dockerfile (builds udp2raw binary)
 ├── obfs4/               – OBFS4 proxy (Dockerfile + entrypoints)
-└── suricata/            – IDS configuration and rules
+├── suricata/            – IDS configuration and rules (uses suricata-update)
+└── zeek/                – NSM configuration (local.zeek for JSON logging)
 ```
 
 ### Results & Artifacts
 ```text
 results/
-├── suricata-alerts/    – IDS outputs (eve.json, fast.log)
-├── zeek-logs/          – Zeek logs (conn.log, dns.log, etc.)
+├── suricata-alerts/    – Real-time IDS outputs (eve.json, fast.log)
+├── zeek-logs/          – Real-time Zeek JSON logs (conn.log, etc.)
 └── runs/
-    ├── baseline/       – Baseline experiment results
+    ├── baseline/       – Baseline experiment results per timestamp
+    │   └── <timestamp>/
+    │       ├── pcap/           – Captured PCAP
+    │       ├── pcap_features/  – Tshark-extracted packets.csv
+    │       ├── suricata/       – IDS alerts (eve.json, fast.log)
+    │       ├── zeek/           – Flow logs (conn.log)
+    │       ├── iperf/          – (Streaming mode only) iperf.json
+    │       └── metadata.json   – Run config: scenario, mode, seed, tool versions
     ├── udp2raw/        – UDP2RAW experiment results
     └── obfs4/          – OBFS4 experiment results
+```
 
 ### Analysis Tools (`analysis/`)
-Contains Python notebooks for deep traffic inspection:
-- `analysis/Analysis_Starter.ipynb` – Main Jupyter Notebook for parsing PCAPs and generating plots.
-- `analysis/requirements.txt` – Python dependencies for the analysis environment.
-
-```
+Contains Jupyter Notebooks for deep traffic inspection:
+- `analysis/Analysis_Starter.ipynb` – Main notebook for visualizing IDS alerts, flow stats, and packet features.
+- `analysis/requirements.txt` – Python dependencies.
 
 ---
 
@@ -306,7 +317,7 @@ docker compose -f compose/compose.yml -f compose/compose.obfs4.yml down -v
 
 ### Clean experiment results (optional)
 ```bash
-rm -rf results/runs/* results/suricata-alerts/*
+sudo rm -rf results/runs/* results/suricata-alerts/*
 ```
 
 ---
@@ -466,8 +477,6 @@ While the current work covers **Feature Engineering** (Entropy, IAT), a logical 
 - **Feature Extraction:** Use flow-level features (duration, packet counts, bytes) and time-series data (inter-arrival times) identified in this lab.
 - **Classification:** Train models to distinguish between "Web Browsing" and "Obfuscated VPN" based on the statistical anomalies preserved by the obfuscation tools (e.g., specific burst patterns in UDP2RAW).
 - **Goal:** To overcome the limitations of signature-based detection (Suricata) demonstrated in this project.
-
-
 
 ---
 

@@ -18,7 +18,7 @@ services:
       - PEERDNS=1.1.1.1
       - ALLOWEDIPS=0.0.0.0/0
     volumes:
-      - ../services/gateway/wireguard:/config
+      - ../services/gateway/obfs4:/config
       - /lib/modules:/lib/modules:ro
     networks:
       internal_net:

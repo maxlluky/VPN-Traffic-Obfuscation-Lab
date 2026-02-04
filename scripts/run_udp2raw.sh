@@ -7,12 +7,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 setup_common_vars
 
 # Specific Config
+SCENARIO="udp2raw"
 SNIFF_KEY="${SNIFF_KEY:-client_net}"
 TS="$(date -u +"%d-%m-%Y-%H-%M-%S")"
 RUN_DIR="$REPO_ROOT/results/runs/udp2raw/$TS"
 PCAP_FILE="$RUN_DIR/wg-udp2raw.pcap"
 
 mkdir -p "$RUN_DIR"
+echo "{\"traffic_mode\": \"${TRAFFIC_MODE:-burst}\"}" > "$RUN_DIR/run_info.json"
 check_docker
 
 COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose/compose.udp2raw.yml}"

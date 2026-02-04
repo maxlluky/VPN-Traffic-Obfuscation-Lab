@@ -1,18 +1,26 @@
 ############################
 # Cryptographic material (never commit)
 ############################
-# Ignore all generated WireGuard state (keys, configs, QR codes, etc.)
-services/**/wireguard/**
-!services/**/wireguard/**/*.template
-!services/**/wireguard/**/wg0.conf
-!services/**/udp2raw/**/*.template
-!services/**/udp2raw/**/wg0.conf
-!services/**/obfs4/**/*.template
-!services/**/obfs4/**/wg0.conf
+# Ignore only sensitive WireGuard files (private keys, QR codes, etc.)
+# but allow wg0.conf and templates to be tracked for easy project setup
 
-# Keep init scripts tracked
-!services/gateway/wireguard/custom-cont-init.d/
-!services/gateway/wireguard/custom-cont-init.d/**
+# Private/public key pairs (generated at runtime)
+**/privatekey-*
+**/publickey-*
+**/presharedkey-*
+
+# QR code images (contain private keys)
+**/*.png
+!docs/*.png
+
+# LinuxServer.io WireGuard container metadata
+**/.donoteditthisfile
+
+# Keep all configs and templates tracked
+# - wg0.conf files
+# - *.template files  
+# - custom-cont-init.d scripts
+# - wg_confs/ directories
 
 ############################
 # Environment / secrets
@@ -40,6 +48,7 @@ results/
 tmp/
 build/
 *~
+iperf_output.json
 
 ############################
 # Editor / OS noise

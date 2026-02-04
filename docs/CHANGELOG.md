@@ -1,5 +1,41 @@
 # Lab Notes
 
+## 2026-02-04
+### Added
+- **Realistic Traffic Generation:**
+    - Created `services/client/traffic_gen.py` Python script for seeded, weighted HTTP traffic.
+    - Supports weighted selection (HTML vs. large binaries), randomized think-time, and reproducibility via `--seed`.
+    - Installed Python3 and `py3-requests` in the client Dockerfile.
+- **Data Pipeline Enhancements:**
+    - `scripts/pcap_to_packet_csv.sh`: Extracts packet-level features (size, timing, flags) via Tshark to `packets.csv`.
+    - `metadata.json` generated per run: Contains scenario, mode, seed, and exact tool versions (Suricata, Zeek, Tshark).
+- **Suricata Rule Management:**
+    - Custom `services/suricata/Dockerfile` and `entrypoint.sh` to run `suricata-update` and load ET Open rules.
+    - Logs loaded rule count in `suricata_meta.json`.
+- **Zeek JSON Logging:**
+    - Created `services/zeek/local.zeek` policy to enable JSON output for `conn.log`.
+- **Target Server Assets:**
+    - Created `services/target/html/index.html` and dummy binary assets (50KB, 200KB, 1MB) for realistic burst traffic.
+
+### Changed
+- **Project Structure Refactoring:**
+    - Reorganized `services/gateway/` into scenario-specific directories: `wireguard/` (Standard), `udp2raw/`, `obfs4/`.
+    - Each obfuscation scenario now has its own WireGuard config with lowered MTU (1200) to prevent packet fragmentation issues.
+    - Updated all `compose.*.yml` files to reference the new structure.
+- **Analysis Notebook:**
+    - Completely rewrote `Analysis_Starter.ipynb` to use the new data formats (JSON Zeek logs, `packets.csv`, `metadata.json`).
+    - Notebook now has 4 sections: Run Metadata, IDS Visibility, Traffic Fingerprinting, Performance.
+- **User Feedback:**
+    - Added `flush=True` to Python traffic generator and run with `python3 -u` for real-time output.
+    - iPerf directory is now only created if iperf produces output (Streaming mode).
+
+### Fixed
+- **UDP2RAW & OBFS4 Stability:**
+    - Resolved timeouts for large file downloads by setting `MTU = 1200` in WireGuard configs for obfuscation scenarios.
+- **Obsolete Files:**
+    - Cleaned auto-generated files (`peer_client1/`, `server/`, etc.) from `services/gateway/udp2raw`.
+
+
 ## 2026-01-26
 - Created Ubuntu Server 24.04.3 LTS VM (lab-host) on Windows 11 host.
 - Enabled SSH administration.

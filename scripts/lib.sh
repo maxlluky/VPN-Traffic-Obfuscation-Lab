@@ -139,6 +139,9 @@ stop_tcpdump() {
 #######################################
 # Traffic Generation
 #######################################
+#######################################
+# Traffic Generation
+#######################################
 generate_traffic() {
     local client_container="$1"
     local target_ip="$2"
@@ -148,22 +151,21 @@ generate_traffic() {
     # Traffic Mode Defaults
     TRAFFIC_MODE="${TRAFFIC_MODE:-burst}"   # burst | streaming
     STREAM_DURATION="${STREAM_DURATION:-60}" # seconds for streaming
+    SEED="${SEED:-$(date +%s)}" # Default seed if not set
     
-    log "Generating traffic (Mode: $TRAFFIC_MODE)..."
+    export SEED # Export for other functions if needed
+    
+    log "Generating traffic (Mode: $TRAFFIC_MODE, Seed: $SEED)..."
 
     if [ "$TRAFFIC_MODE" == "streaming" ]; then
         log "Streaming mode: Running iperf3 for $STREAM_DURATION seconds..."
         
-        # Run iperf3 client
-        # -c target_ip: connect to target
-        # -t duration: run for X seconds
-        # -p 5201: default iperf3 port
-        if ! docker exec "$client_container" iperf3 -c "$target_ip" -t "$STREAM_DURATION" >/dev/null & then
+        # Run iperf3 client with JSON output
+        if ! docker exec "$client_container" iperf3 -c "$target_ip" -t "$STREAM_DURATION" -J > iperf_output.json 2>/dev/null & then
              IPERF_PID=$!
              
              # Progress bar
              for i in $(seq 1 "$STREAM_DURATION"); do
-                 # Calculate progress
                  perc=$((i * 100 / STREAM_DURATION))
                  filled=$((perc / 2))
                  bar=$(printf "%-${filled}s" "#" | sed 's/ /#/g')
@@ -177,30 +179,18 @@ generate_traffic() {
              sleep "$STREAM_DURATION"
         fi
     else
-        # Burst Mode (Default)
-        log "Burst mode: $count requests..."
-        FAIL_COUNT=0
-        for i in $(seq 1 "$count"); do
-          if ! timeout 10s docker exec "$client_container" sh -lc "curl -s --max-time 5 http://$target_ip:$target_port/ >/dev/null"; then
-              log "WARNING: Request $i failed or timed out."
-              FAIL_COUNT=$((FAIL_COUNT+1))
-              if [ "$FAIL_COUNT" -ge 10 ]; then
-                die "Aborting: 10 consecutive failures detected."
-              fi
-          else
-              # Progress bar calculation
-              perc=$((i * 100 / count))
-              filled=$((perc / 2))
-              bar=$(printf "%-${filled}s" "#" | sed 's/ /#/g')
-              printf "\r[*] Generating: [%-50s] %d/%d reqs (%d%%)" "$bar" "$i" "$count" "$perc"
-              FAIL_COUNT=0
-          fi
-        done
-        echo ""
+        # Burst Mode via Python Script
+        log "Burst mode: $count requests (Python generator)..."
+        
+        # We assume traffic_gen.py is at /usr/local/bin/traffic_gen.py
+        docker exec "$client_container" python3 -u /usr/local/bin/traffic_gen.py \
+            --target "http://$target_ip:$target_port" \
+            --count "$count" \
+            --seed "$SEED" \
+            --delay-min 0.1 --delay-max 2.0 || die "Traffic generation failed."
     fi
     
-    log "Waiting 5 seconds for logs to flush..."
-    sleep 5
+    echo ""
 }
 
 #######################################
@@ -211,25 +201,99 @@ collect_artifacts() {
     local pcap_file="$2"
     
     log "Organizing artifacts..."
+
+    # Flushing Zeek logs
+    log "Stopping Zeek to flush logs..."
+    docker stop zeek-nsm >/dev/null 2>&1 || true
+    sleep 5
     
     # Create subdirectories
-    mkdir -p "$run_dir/pcap" "$run_dir/suricata" "$run_dir/zeek"
+    mkdir -p "$run_dir/pcap" "$run_dir/suricata" "$run_dir/zeek" "$run_dir/pcap_features"
     
     # Move PCAP
     if [ -f "$pcap_file" ]; then
         mv "$pcap_file" "$run_dir/pcap/"
-        if [ -f "${pcap_file}.log" ]; then
-            mv "${pcap_file}.log" "$run_dir/pcap/"
-        fi
+    fi
+    # If tcpdump produced .log (stderr), move it too
+    if [ -f "${pcap_file}.log" ]; then
+        mv "${pcap_file}.log" "$run_dir/pcap/"
     fi
 
-    # Copy Suricata logs
-    sudo cp "$FAST_LOG" "$run_dir/suricata/fast.log" 2>/dev/null || cp "$FAST_LOG" "$run_dir/suricata/fast.log"
-    sudo cp "$EVE_LOG"  "$run_dir/suricata/eve.json" 2>/dev/null || cp "$EVE_LOG"  "$run_dir/suricata/eve.json"
+    # Copy Suricata logs (fast.log, eve.json)
+    sudo cp "$FAST_LOG" "$run_dir/suricata/fast.log" 2>/dev/null || true
+    sudo cp "$EVE_LOG"  "$run_dir/suricata/eve.json" 2>/dev/null || true
+    # Copy Suricata metadata if it exists (from volume map)
+    # We mapped ../results/suricata-alerts:/var/log/suricata
+    if [ -f "$SURICATA_LOG_DIR/suricata_meta.json" ]; then
+        sudo cp "$SURICATA_LOG_DIR/suricata_meta.json" "$run_dir/suricata/metadata.json"
+    fi
     
     # Copy Zeek logs
     sudo cp "$ZEEK_LOG_DIR"/*.log "$run_dir/zeek/" 2>/dev/null || true
     
+    # Move iperf output if exists
+    # Move iperf output if exists
+    if [ -f "iperf_output.json" ]; then
+        mkdir -p "$run_dir/iperf"
+        mv "iperf_output.json" "$run_dir/iperf/iperf.json"
+    fi
+
+    # ---------------------------------------------------------
+    # Generate Run Metadata
+    # ---------------------------------------------------------
+    log "Generating Metadata..."
+    
+    # Get Tool Versions
+    # Suricata (from container if possible, or assume generic if already down, but we just stopped zeek, suricata might be up)
+    # Actually, we can get it from the suricata_meta.json if we captured it.
+    # Otherwise try docker exec.
+    SURICATA_VER="Unknown"
+    if docker ps -q -f name=suricata-ids | grep -q .; then
+        SURICATA_VER=$(docker exec suricata-ids suricata -V 2>/dev/null | head -n 1)
+    fi
+
+    ZEEK_VER="Unknown"
+    # Zeek container is stopped above. We should have captured it before or restart/run just for version? 
+    # Or just use the image tag. 
+    # Let's rely on `zeek --version` via temporary container or assume "zeek" command availability?
+    # Better: Start a temp container to get version or check if we can get it from logs.
+    # `docker run --rm ${ZEEK_IMAGE} zeek --version` might work if variable available.
+    # For now, let's try to get it from the stopped container logs or start it briefly? 
+    # Actually, let's just run a quick check command.
+    ZEEK_VER=$(docker run --rm --entrypoint zeek "${ZEEK_IMAGE:-zeek/zeek:latest}" --version 2>/dev/null | head -n 1)
+
+    TSHARK_VER=$(tshark --version 2>/dev/null | head -n 1 | sed 's/Running on.*//')
+    
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    
+    cat <<EOF > "$run_dir/metadata.json"
+{
+  "timestamp": "$TIMESTAMP",
+  "seed": "$SEED",
+  "mode": "$TRAFFIC_MODE",
+  "scenario": "${SCENARIO:-unknown}",
+  "versions": {
+    "suricata": "$SURICATA_VER",
+    "zeek": "$ZEEK_VER",
+    "tshark": "$TSHARK_VER"
+  }
+}
+EOF
+
+    # ---------------------------------------------------------
+    # PCAP Feature Extraction
+    # ---------------------------------------------------------
+    local packet_csv="$run_dir/pcap_features/packets.csv"
+    local pcap_path="$run_dir/pcap/$(basename "$pcap_file")"
+    
+    if [ -f "$pcap_path" ]; then
+        log "Extracting Packet Features to $packet_csv..."
+        # Call extraction script
+        "$REPO_ROOT/scripts/pcap_to_packet_csv.sh" "$pcap_path" "$packet_csv"
+    else
+        log "WARNING: No PCAP found for extraction."
+    fi
+
     log "Artifacts created in $run_dir:"
     ls -R "$run_dir" | sed 's/^/    /'
 }
