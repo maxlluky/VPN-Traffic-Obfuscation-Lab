@@ -11,7 +11,7 @@ services:
       external_net:
         ipv4_address: 172.30.30.10
     volumes:
-      - ../services/target/html:/usr/share/nginx/html
+      - ../services/target-server/html:/usr/share/nginx/html
     # Install iperf3 and run it in background, then start nginx
     entrypoint: /bin/sh -c "apk add --no-cache iperf3 && iperf3 -s -D && nginx -g 'daemon off;'"
 

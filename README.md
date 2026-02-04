@@ -39,19 +39,23 @@ The project uses **multiple compose files** for clarity and modularity, located 
 ### Services Directory
 ```text
 services/
-├── client/              – Traffic generator (Python script, curl, iperf)
-├── gateway/
-│   ├── wireguard/       – WireGuard server config (Baseline, Standard MTU)
-│   ├── udp2raw/         – WireGuard server config (UDP2RAW scenario, Low MTU) + Sidecar entrypoint.sh
-│   └── obfs4/           – WireGuard server config (OBFS4 scenario, Low MTU)
-├── wg-client/
-│   ├── wireguard/       – WireGuard client config (Baseline)
-│   ├── udp2raw/         – WireGuard client config (UDP2RAW scenario)
-│   └── obfs4/           – WireGuard client config (OBFS4 scenario)
-├── udp2raw/             – UDP2RAW Dockerfile (builds udp2raw binary)
-├── obfs4/               – OBFS4 proxy (Dockerfile + entrypoints)
-├── suricata/            – IDS configuration and rules (uses suricata-update)
-└── zeek/                – NSM configuration (local.zeek for JSON logging)
+├── traffic-client/       – Traffic generator (Python script, curl, iperf)
+├── target-server/        – Nginx with static assets
+│   └── html/
+├── vpn-server/           – WireGuard server configurations
+│   ├── baseline/         – Standard MTU config
+│   ├── udp2raw/          – Low MTU + sidecar entrypoint.sh
+│   └── obfs4/            – Low MTU config
+├── vpn-client/           – WireGuard client configurations
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   ├── baseline/         – wg0.conf for Baseline
+│   ├── udp2raw/          – wg0.conf for UDP2RAW
+│   └── obfs4/            – wg0.conf for OBFS4
+├── proxy-obfs4/          – OBFS4 proxy (Dockerfile + configs)
+├── proxy-udp2raw/        – UDP2RAW proxy (Dockerfile)
+├── suricata/             – IDS (uses suricata-update)
+└── zeek/                 – NSM (JSON logging)
 ```
 
 ### Results & Artifacts

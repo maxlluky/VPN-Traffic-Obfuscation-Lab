@@ -18,7 +18,7 @@ services:
       - PEERDNS=1.1.1.1
       - ALLOWEDIPS=0.0.0.0/0
     volumes:
-      - ../services/gateway/udp2raw:/config
+      - ../services/vpn-server/udp2raw:/config
       - /lib/modules:/lib/modules:ro
     networks:
       internal_net:
@@ -32,7 +32,7 @@ services:
 
   udp2raw-gateway:
     build:
-      context: ../services/udp2raw
+      context: ../services/proxy-udp2raw
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     image: ${UDP2RAW_IMAGE}
@@ -45,7 +45,7 @@ services:
       - TARGET_HOST=192.168.20.2
       - TARGET_PORT=51820
     volumes:
-      - ../services/gateway/udp2raw/entrypoint.sh:/entrypoint.sh:ro
+      - ../services/vpn-server/udp2raw/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /entrypoint.sh
     networks:
       client_net:
@@ -55,14 +55,14 @@ services:
 
   wg-client:
     build:
-      context: ../services/wg-client
+      context: ../services/vpn-client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: wg-client
     cap_add:
       - NET_ADMIN
     volumes:
-      - ../services/wg-client/udp2raw:/config:ro
+      - ../services/vpn-client/udp2raw:/config:ro
     networks:
       client_net:
         ipv4_address: 192.168.10.10
@@ -71,7 +71,7 @@ services:
 
   udp2raw-client:
     build:
-      context: ../services/udp2raw
+      context: ../services/proxy-udp2raw
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     image: ${UDP2RAW_IMAGE}
@@ -84,13 +84,13 @@ services:
       - SERVER_PORT=${UDP2RAW_GATEWAY_PORT:-443}
       - TARGET_PORT=51820
     volumes:
-      - ../services/wg-client/udp2raw/entrypoint.sh:/entrypoint.sh:ro
+      - ../services/vpn-client/udp2raw/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /entrypoint.sh
     network_mode: "service:wg-client"
 
   client:
     build:
-      context: ../services/client
+      context: ../services/traffic-client
       args:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: client-node
