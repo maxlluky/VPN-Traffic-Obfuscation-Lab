@@ -1,5 +1,14 @@
 # Lab Notes
 
+## 2026-02-26
+### Changed
+- **Project Structure:** Refactored and simplified the repository structure for better maintainability and clarity.
+- **VPN Configurations:** Updated baseline WireGuard configurations to ensure out-of-the-box functionality.
+
+### Fixed
+- **WireGuard Handshake Issue:** Resolved a bug where the baseline WireGuard configurations (`services/vpn-client/baseline/wg0.conf` and `services/vpn-server/baseline/wg_confs/wg0.conf`) contained mismatched public/private key pairs preventing the tunnel from establishing. Keys are now correctly synced.
+- **Permissions Issue:** Fixed an issue where the `results/` folder lacked appropriate write permissions for the `lab-admin` user, which caused the testing scripts (`run_baseline.sh`) to fail when attempting to create result directories.
+
 ## 2026-02-04
 ### Added
 - **Realistic Traffic Generation:**
