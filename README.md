@@ -150,11 +150,9 @@ The experiment scripts support two traffic generation modes, controlled via the 
 ```bash
 # Default (Burst)
 bash scripts/run_baseline.sh
-# or: bash scripts/run_scenario.sh baseline
 
 # Streaming (Recommended for Analysis)
 TRAFFIC_MODE=streaming bash scripts/run_baseline.sh
-# or: TRAFFIC_MODE=streaming bash scripts/run_scenario.sh baseline
 ```
 
 ## Scenarios
@@ -164,7 +162,6 @@ Run the baseline WireGuard experiment without obfuscation:
 
 ```bash
 bash scripts/run_baseline.sh
-# or: bash scripts/run_scenario.sh baseline
 ```
 
 **What it does:**
@@ -192,7 +189,6 @@ Run the UDP2RAW obfuscation experiment (WireGuard wrapped in TCP/443):
 
 ```bash
 bash scripts/run_udp2raw.sh
-# or: bash scripts/run_scenario.sh udp2raw
 ```
 
 **What it does:**
@@ -215,7 +211,6 @@ Run the OBFS4 obfuscation experiment:
 
 ```bash
 bash scripts/run_obfs4.sh
-# or: bash scripts/run_scenario.sh obfs4
 ```
 
 **What it does:**
