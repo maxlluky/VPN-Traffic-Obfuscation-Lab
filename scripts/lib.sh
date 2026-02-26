@@ -139,9 +139,6 @@ stop_tcpdump() {
 #######################################
 # Traffic Generation
 #######################################
-#######################################
-# Traffic Generation
-#######################################
 generate_traffic() {
     local client_container="$1"
     local target_ip="$2"
@@ -161,7 +158,7 @@ generate_traffic() {
         log "Streaming mode: Running iperf3 for $STREAM_DURATION seconds..."
         
         # Run iperf3 client with JSON output
-        if ! docker exec "$client_container" iperf3 -c "$target_ip" -t "$STREAM_DURATION" -J > iperf_output.json 2>/dev/null & then
+        if docker exec "$client_container" iperf3 -c "$target_ip" -t "$STREAM_DURATION" -J > iperf_output.json 2>/dev/null & then
              IPERF_PID=$!
              
              # Progress bar
@@ -231,7 +228,6 @@ collect_artifacts() {
     # Copy Zeek logs
     sudo cp "$ZEEK_LOG_DIR"/*.log "$run_dir/zeek/" 2>/dev/null || true
     
-    # Move iperf output if exists
     # Move iperf output if exists
     if [ -f "iperf_output.json" ]; then
         mkdir -p "$run_dir/iperf"

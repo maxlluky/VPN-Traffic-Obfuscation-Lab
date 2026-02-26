@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 # scripts/pcap_to_packet_csv.sh
 # Usage: ./pcap_to_packet_csv.sh <input.pcap> <output.csv>
 

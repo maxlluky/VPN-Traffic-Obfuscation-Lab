@@ -129,9 +129,9 @@ Edit `compose/.env` if required. Key variables:
 If you *do* need to reset keys:
 1. **Copy the templates:**
    ```bash
-   cp services/wg-client/wireguard/wg0.conf.template services/wg-client/wireguard/wg0.conf
-   cp services/wg-client/udp2raw/wg0.conf.template services/wg-client/udp2raw/wg0.conf
-   cp services/wg-client/obfs4/wg0.conf.template services/wg-client/obfs4/wg0.conf
+   cp services/vpn-client/baseline/wg0.conf.template services/vpn-client/baseline/wg0.conf
+   cp services/vpn-client/udp2raw/wg0.conf.template services/vpn-client/udp2raw/wg0.conf
+   cp services/vpn-client/obfs4/wg0.conf.template services/vpn-client/obfs4/wg0.conf
    ```
 
 2. **Fill in your keys:**
@@ -151,9 +151,11 @@ The experiment scripts support two traffic generation modes, controlled via the 
 ```bash
 # Default (Burst)
 bash scripts/run_baseline.sh
+# or: bash scripts/run_scenario.sh baseline
 
 # Streaming (Recommended for Analysis)
 TRAFFIC_MODE=streaming bash scripts/run_baseline.sh
+# or: TRAFFIC_MODE=streaming bash scripts/run_scenario.sh baseline
 ```
 
 ## Scenarios
@@ -163,6 +165,7 @@ Run the baseline WireGuard experiment without obfuscation:
 
 ```bash
 bash scripts/run_baseline.sh
+# or: bash scripts/run_scenario.sh baseline
 ```
 
 **What it does:**
@@ -190,6 +193,7 @@ Run the UDP2RAW obfuscation experiment (WireGuard wrapped in TCP/443):
 
 ```bash
 bash scripts/run_udp2raw.sh
+# or: bash scripts/run_scenario.sh udp2raw
 ```
 
 **What it does:**
@@ -212,6 +216,7 @@ Run the OBFS4 obfuscation experiment:
 
 ```bash
 bash scripts/run_obfs4.sh
+# or: bash scripts/run_scenario.sh obfs4
 ```
 
 **What it does:**
@@ -251,8 +256,6 @@ for scenario in baseline udp2raw obfs4; do
   echo "$scenario: $count alerts"
 done
 ```
-
----
 
 ---
 
