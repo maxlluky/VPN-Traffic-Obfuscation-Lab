@@ -6,8 +6,10 @@
 - **VPN Configurations:** Updated baseline WireGuard configurations to ensure out-of-the-box functionality.
 
 ### Fixed
-- **WireGuard Handshake Issue:** Resolved a bug where the baseline WireGuard configurations (`services/vpn-client/baseline/wg0.conf` and `services/vpn-server/baseline/wg_confs/wg0.conf`) contained mismatched public/private key pairs preventing the tunnel from establishing. Keys are now correctly synced.
-- **Permissions Issue:** Fixed an issue where the `results/` folder lacked appropriate write permissions for the `lab-admin` user, which caused the testing scripts (`run_baseline.sh`) to fail when attempting to create result directories.
+- **WireGuard Handshake Synchronization:** Synchronized static public/private key pairs across the baseline WireGuard configurations (`services/vpn-client/baseline/wg0.conf` and `services/vpn-server/baseline/wg_confs/wg0.conf`) to ensure reliable end-to-end tunnel establishment.
+- **Static Configuration Persistence:** Refined the Docker Compose environment parameters by removing the `PEERS` auto-generation variable. This guarantees that the `linuxserver/wireguard` containers retain the predefined static `wg0.conf` topologies instead of dynamically overwriting them on boot.
+- **OBFS4 Routing and Protocol Robustness:** Enhanced the OBFS4 Python bridge (`pt_adapter.py`) by implementing case-insensitive protocol handshake parsing, preventing `IndexError` exceptions during SOCKS5 negotiation. Furthermore, updated the `TARGET_HOST` routing definitions in `obfs4-client` to smoothly align with the recent `vpn-gateway` container renaming, fully restoring Shadowsocks UDP-to-TCP encapsulation.
+- **Artifact Pipeline Permissions:** Assigned correct write permissions for the `lab-admin` user on the `results/` telemetry folder, ensuring seamless automated report generation during scenario testing.
 
 ## 2026-02-04
 ### Added

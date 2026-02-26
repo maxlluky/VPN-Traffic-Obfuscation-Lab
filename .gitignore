@@ -22,6 +22,10 @@
 # - custom-cont-init.d scripts
 # - wg_confs/ directories
 
+# Ignore auto-generated peer and dns directories
+**/peer_*/
+**/coredns/
+
 ############################
 # Environment / secrets
 ############################

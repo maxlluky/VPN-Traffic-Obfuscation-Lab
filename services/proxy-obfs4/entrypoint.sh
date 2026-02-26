@@ -6,7 +6,7 @@ MODE="${MODE:-client}"
 SERVER="${SERVER:-obfs4-gateway}"
 SERVER_PORT="${SERVER_PORT:-12345}"
 LISTEN_PORT="${LISTEN_PORT:-12345}"
-TARGET_HOST="${TARGET_HOST:-gateway}"
+TARGET_HOST="${TARGET_HOST:-vpn-gateway}"
 TARGET_PORT="${TARGET_PORT:-51820}"
 PASSWORD="${PASSWORD:-lab-obfuscation-secret}"
 

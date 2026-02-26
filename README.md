@@ -9,7 +9,6 @@ This repository contains a reproducible Docker-based testbed to evaluate the det
 ### Author Information
 **Max Luckert**
 - **University:** Wrexham University
-- **Student ID:** S24014929
 - **Email:** [S24014929@mail.glyndwr.ac.uk](mailto:S24014929@mail.glyndwr.ac.uk) | [mluckert@outlook.de](mailto:mluckert@outlook.de)
 
 ---

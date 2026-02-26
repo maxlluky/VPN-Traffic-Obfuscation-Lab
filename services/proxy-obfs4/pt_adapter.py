@@ -121,7 +121,7 @@ def start_client():
     while True:
         line = proc.stdout.readline()
         if not line: break
-        if "CMETHOD obfs4 socks5" in line.lower():
+        if "cmethod obfs4 socks5" in line.lower():
             addr = line.split()[3]
             socks_addr = (addr.split(":")[0], int(addr.split(":")[1]))
             break
