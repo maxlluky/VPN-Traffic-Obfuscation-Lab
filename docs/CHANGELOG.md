@@ -1,9 +1,26 @@
 # Lab Notes
 
+## 2026-03-10
+### Fixed
+- **Repository Setup (Fresh Clone):** Confirmed that `cp compose/.env.example compose/.env` is the only required manual step after cloning. All WireGuard key pairs were cryptographically verified (Curve25519) — all three scenarios correct.
+- **Kernel Module Issue (Arch Linux):** Resolved Docker networking failure (`veth` module not found) caused by a kernel update without reboot. Running kernel (`6.18.9`) did not match installed modules (`6.19.6`). Fixed by rebooting into the updated kernel.
+- **README Clone URL:** Corrected the `git clone` URL from the outdated `vpn-lab.git` to the correct `VPN-Traffic-Obfuscation-Lab.git`.
+- **README Architecture Diagrams:** Updated all three traffic flow diagrams to use current container names (`vpn-gateway`, `target-server`) and added capture point annotations.
+
+### Changed
+- **`.gitignore`:** Added exclusions for two auto-generated file types that should never be committed:
+    - `services/suricata/rules/suricata.rules` — downloaded fresh at container build time by `suricata-update` (~43 MB, changes with every ET Open release).
+    - `**/templates/peer.conf` and `**/templates/server.conf` — generated at runtime by the `linuxserver/wireguard` image; irrelevant since static `wg_confs/wg0.conf` is used.
+- **`docs/CHANGELOG.md`:** Backfilled missing entries for the service rename refactor (2026-02-04) and `run_scenario.sh` consolidation (2026-02-26).
+
+### Verified
+- All three scenarios (Baseline, UDP2RAW, OBFS4) run successfully end-to-end on Arch Linux after fresh clone.
+
 ## 2026-02-26
 ### Changed
 - **Project Structure:** Refactored and simplified the repository structure for better maintainability and clarity.
 - **VPN Configurations:** Updated baseline WireGuard configurations to ensure out-of-the-box functionality.
+- **Script Consolidation:** Merged scenario execution logic into a new unified `scripts/run_scenario.sh`. The existing `run_baseline.sh`, `run_udp2raw.sh`, and `run_obfs4.sh` scripts are now thin wrappers that delegate to it. Eliminates code duplication and centralises all experiment parameters.
 
 ### Fixed
 - **WireGuard Handshake Synchronization:** Synchronized static public/private key pairs across the baseline WireGuard configurations (`services/vpn-client/baseline/wg0.conf` and `services/vpn-server/baseline/wg_confs/wg0.conf`) to ensure reliable end-to-end tunnel establishment.
@@ -11,7 +28,10 @@
 - **OBFS4 Routing and Protocol Robustness:** Enhanced the OBFS4 Python bridge (`pt_adapter.py`) by implementing case-insensitive protocol handshake parsing, preventing `IndexError` exceptions during SOCKS5 negotiation. Furthermore, updated the `TARGET_HOST` routing definitions in `obfs4-client` to smoothly align with the recent `vpn-gateway` container renaming, fully restoring Shadowsocks UDP-to-TCP encapsulation.
 - **Artifact Pipeline Permissions:** Assigned correct write permissions for the `lab-admin` user on the `results/` telemetry folder, ensuring seamless automated report generation during scenario testing.
 
-## 2026-02-04
+### Docs
+- Removed redundant alternative command examples from README to reduce clutter.
+
+## 2026-02-04 / 2026-02-05
 ### Added
 - **Realistic Traffic Generation:**
     - Created `services/client/traffic_gen.py` Python script for seeded, weighted HTTP traffic.
@@ -45,6 +65,15 @@
     - Resolved timeouts for large file downloads by setting `MTU = 1200` in WireGuard configs for obfuscation scenarios.
 - **Obsolete Files:**
     - Cleaned auto-generated files (`peer_client1/`, `server/`, etc.) from `services/gateway/udp2raw`.
+
+### Changed
+- **Service Renaming for Clarity:** Renamed all Docker Compose services to more descriptive names to improve readability across compose files, scripts, and logs:
+    - `client` → `traffic-client`
+    - `target` → `target-server`
+    - `gateway` → `vpn-server`
+    - `wg-client` → `vpn-client`
+    - `obfs4` → `proxy-obfs4`
+    - `udp2raw` → `proxy-udp2raw`
 
 
 ## 2026-01-26

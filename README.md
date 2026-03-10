@@ -107,8 +107,8 @@ docker compose version
 
 ### 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/maxlluky/vpn-lab.git
-cd vpn-lab
+git clone https://github.com/maxlluky/VPN-Traffic-Obfuscation-Lab.git
+cd VPN-Traffic-Obfuscation-Lab
 ```
 
 ### 2️⃣ Prepare environment variables
@@ -340,9 +340,9 @@ client-node (192.168.10.10)
     ↓
 wg-client (WireGuard UDP/51820)
     ↓
-gateway (192.168.10.2 ↔ 172.30.30.2)
+vpn-gateway (192.168.10.2 ↔ 172.30.30.2)
     ↓
-target (172.30.30.10)
+target-server (172.30.30.10)
 ```
 
 ### Traffic Flow: UDP2RAW
@@ -353,13 +353,13 @@ wg-client (127.0.0.1:51820)
     ↓
 udp2raw-client (unwraps TCP/443 → UDP/51820)
     ↓ (TCP/443)
-[external_net bridge]
+[client_net bridge] ← Suricata/Zeek capture point
     ↓ (TCP/443)
 udp2raw-gateway (wraps TCP/443 → UDP/51820)
     ↓
-gateway (WireGuard UDP/51820)
+vpn-gateway (WireGuard UDP/51820)
     ↓
-target (172.30.30.10)
+target-server (172.30.30.10)
 ```
 
 ### Traffic Flow: OBFS4
@@ -370,13 +370,13 @@ wg-client (127.0.0.1:51820)
     ↓
 obfs4-client (wraps UDP/51820 in OBFS4)
     ↓ (OBFS4 protocol, TCP/${OBFS4_PORT})
-[external_net bridge]
+[client_net bridge] ← Suricata/Zeek capture point
     ↓ (OBFS4 protocol)
 obfs4-gateway (unwraps OBFS4 → UDP/51820)
     ↓
-gateway (WireGuard UDP/51820)
+vpn-gateway (WireGuard UDP/51820)
     ↓
-target (172.30.30.10)
+target-server (172.30.30.10)
 ```
 
 ### Design Rationale
