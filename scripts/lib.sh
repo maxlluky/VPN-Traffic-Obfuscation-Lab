@@ -105,7 +105,7 @@ detect_network_info() {
 reset_ids_logs() {
     local bridge_if="$1"
     local compose_flags="$2"
-    
+
     log "Resetting Suricata & Zeek logs..."
     sudo -v
     sudo sh -lc " : > '$FAST_LOG' ; : > '$EVE_LOG' "
@@ -113,6 +113,22 @@ reset_ids_logs() {
 
     log "Recreating IDS services (BRIDGE_IF=$bridge_if)..."
     BRIDGE_IF="$bridge_if" docker compose $compose_flags up -d --force-recreate --no-deps suricata zeek
+
+    # Wait for Suricata engine to fully initialise (rule parsing + capture ready)
+    wait_for_suricata
+}
+
+wait_for_suricata() {
+    local max_wait=60
+    log "Waiting for Suricata engine to start (loading ET Open rules)..."
+    for i in $(seq 1 "$max_wait"); do
+        if docker logs suricata-ids 2>&1 | grep -qi "engine started"; then
+            log "Suricata engine ready after ${i}s."
+            return 0
+        fi
+        sleep 1
+    done
+    log "WARNING: Suricata did not report 'engine started' within ${max_wait}s. Proceeding anyway."
 }
 
 #######################################
@@ -199,8 +215,9 @@ collect_artifacts() {
     
     log "Organizing artifacts..."
 
-    # Flushing Zeek logs
-    log "Stopping Zeek to flush logs..."
+    # Flush IDS logs by stopping both engines
+    log "Stopping Suricata & Zeek to flush logs..."
+    docker stop suricata-ids >/dev/null 2>&1 || true
     docker stop zeek-nsm >/dev/null 2>&1 || true
     sleep 5
     
@@ -268,10 +285,12 @@ collect_artifacts() {
   "seed": "$SEED",
   "mode": "$TRAFFIC_MODE",
   "scenario": "${SCENARIO:-unknown}",
+  "ndpi_protocol": "${NDPI_PROTO:-N/A}",
   "versions": {
     "suricata": "$SURICATA_VER",
     "zeek": "$ZEEK_VER",
-    "tshark": "$TSHARK_VER"
+    "tshark": "$TSHARK_VER",
+    "ndpi": "${NDPI_VER:-N/A}"
   }
 }
 EOF
@@ -281,13 +300,35 @@ EOF
     # ---------------------------------------------------------
     local packet_csv="$run_dir/pcap_features/packets.csv"
     local pcap_path="$run_dir/pcap/$(basename "$pcap_file")"
-    
+
     if [ -f "$pcap_path" ]; then
         log "Extracting Packet Features to $packet_csv..."
-        # Call extraction script
         "$REPO_ROOT/scripts/pcap_to_packet_csv.sh" "$pcap_path" "$packet_csv"
     else
         log "WARNING: No PCAP found for extraction."
+    fi
+
+    # ---------------------------------------------------------
+    # nDPI Deep Packet Inspection
+    # ---------------------------------------------------------
+    if [ -f "$pcap_path" ] && command -v ndpiReader >/dev/null 2>&1; then
+        mkdir -p "$run_dir/ndpi"
+        log "Running nDPI analysis..."
+
+        # CSV with per-flow details (protocol, IAT, packet lengths, TLS info)
+        ndpiReader -i "$pcap_path" -C "$run_dir/ndpi/flows.csv" > "$run_dir/ndpi/summary.txt" 2>&1
+
+        # Extract detected protocol for quick access
+        NDPI_PROTO=$(grep -A 1 "Detected protocols:" "$run_dir/ndpi/summary.txt" | tail -1 | awk '{print $1}')
+        NDPI_VER=$(ndpiReader --version 2>&1 | head -1 | sed 's/Welcome to //')
+
+        log "nDPI result: $NDPI_PROTO"
+    else
+        NDPI_PROTO="N/A"
+        NDPI_VER="N/A"
+        if [ -f "$pcap_path" ]; then
+            log "WARNING: ndpiReader not found — skipping DPI analysis. Install with: sudo apt install libndpi-bin"
+        fi
     fi
 
     log "Artifacts created in $run_dir:"

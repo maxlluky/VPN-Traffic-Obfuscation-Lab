@@ -1,0 +1,31 @@
+# Validation scenario: Plain HTTP (no VPN) to prove Suricata & Zeek are working.
+# The http-client sits directly on client_net and talks to target-server
+# via a gateway container that routes between client_net and external_net.
+
+services:
+  validate-gateway:
+    image: alpine:${ALPINE_TAG}
+    container_name: validate-gateway
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    command: /bin/sh -c "apk add --no-cache iptables && iptables -t nat -A POSTROUTING -d 172.30.30.0/24 -j MASQUERADE && tail -f /dev/null"
+    networks:
+      client_net:
+        ipv4_address: 192.168.10.2
+      external_net:
+        ipv4_address: 172.30.30.2
+
+  http-client:
+    image: alpine:${ALPINE_TAG}
+    container_name: http-client
+    cap_add:
+      - NET_ADMIN
+    command: /bin/sh -c "apk add --no-cache curl bind-tools && ip route add 172.30.30.0/24 via 192.168.10.2 && tail -f /dev/null"
+    networks:
+      client_net:
+        ipv4_address: 192.168.10.10
+    depends_on:
+      - validate-gateway

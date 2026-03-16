@@ -33,7 +33,7 @@ The project uses **multiple compose files** for clarity and modularity, located 
 - `compose/compose.yml` – Base configuration (target, suricata, networks)
 - `compose/compose.baseline.yml` – Baseline scenario: plain WireGuard
 - `compose/compose.udp2raw.yml` – UDP2RAW obfuscation: WireGuard wrapped in TCP/443
-- `compose/compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped in obfs4 protocol
+- `compose/compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped via Shadowsocks-rust + obfs4proxy (SIP003 plugin)
 
 ### Services Directory
 ```text
@@ -51,7 +51,7 @@ services/
 │   ├── baseline/         – wg0.conf for Baseline
 │   ├── udp2raw/          – wg0.conf for UDP2RAW
 │   └── obfs4/            – wg0.conf for OBFS4
-├── proxy-obfs4/          – OBFS4 proxy (Dockerfile + configs)
+├── proxy-obfs4/          – Shadowsocks-rust + obfs4proxy via SIP003 plugin bridge (pt_adapter.py)
 ├── proxy-udp2raw/        – UDP2RAW proxy (Dockerfile)
 ├── suricata/             – IDS (uses suricata-update)
 └── zeek/                 – NSM (JSON logging)
@@ -90,13 +90,14 @@ Contains Jupyter Notebooks for deep traffic inspection:
 3. Docker Compose v2
 4. Kernel support for WireGuard (`wireguard`, `udp_tunnel`)
 
-5. `bash`, `tcpdump` (required for packet capture on the host)
+5. `bash`, `tcpdump`, `tshark` (required for packet capture and feature extraction)
+6. `ndpiReader` (required for Deep Packet Inspection analysis)
    ```bash
    # Ubuntu/Debian
-   sudo apt install tcpdump
-   
+   sudo apt install tcpdump tshark libndpi-bin
+
    # Arch Linux
-   sudo pacman -S tcpdump
+   sudo pacman -S tcpdump wireshark-cli ndpi
    ```
 
 **Verify Docker:**
@@ -149,10 +150,15 @@ The experiment scripts support two traffic generation modes, controlled via the 
 **Usage:**
 ```bash
 # Default (Burst)
-bash scripts/run_baseline.sh
+bash scripts/run_scenario.sh baseline
 
 # Streaming (Recommended for Analysis)
-TRAFFIC_MODE=streaming bash scripts/run_baseline.sh
+TRAFFIC_MODE=streaming bash scripts/run_scenario.sh baseline
+
+# Run all scenarios sequentially
+for scenario in baseline udp2raw obfs4; do
+  bash scripts/run_scenario.sh "$scenario"
+done
 ```
 
 ## Scenarios
@@ -161,7 +167,7 @@ TRAFFIC_MODE=streaming bash scripts/run_baseline.sh
 Run the baseline WireGuard experiment without obfuscation:
 
 ```bash
-bash scripts/run_baseline.sh
+bash scripts/run_scenario.sh baseline
 ```
 
 **What it does:**
@@ -188,7 +194,7 @@ results/runs/baseline/<dd-mm-yyyy-hh-mm-ss>/
 Run the UDP2RAW obfuscation experiment (WireGuard wrapped in TCP/443):
 
 ```bash
-bash scripts/run_udp2raw.sh
+bash scripts/run_scenario.sh udp2raw
 ```
 
 **What it does:**
@@ -210,15 +216,16 @@ bash scripts/run_udp2raw.sh
 Run the OBFS4 obfuscation experiment:
 
 ```bash
-bash scripts/run_obfs4.sh
+bash scripts/run_scenario.sh obfs4
 ```
 
 **What it does:**
 - Starts `compose/compose.yml` + `compose/compose.obfs4.yml`
-- Wraps WireGuard (UDP/51820) in OBFS4 protocol using obfs4proxy
-- Gateway accepts obfs4 connections and unwraps to WireGuard
-- Client wraps UDP/51820 in obfs4 before sending
-- Captures OBFS4 traffic (TCP port configured in `.env`)
+- Uses **Shadowsocks-rust** (with `-U` UDP relay) and **obfs4proxy** as a SIP003 plugin via `pt_adapter.py`
+- Client: `sslocal` receives WireGuard UDP/51820, encrypts with ChaCha20-Poly1305, and applies obfs4 obfuscation
+- Gateway: `ssserver` unwraps obfs4 → decrypts Shadowsocks → forwards WireGuard UDP/51820
+- Traffic on the wire is **UDP** on port `${OBFS4_PORT}` (default 12345) with randomised obfs4 payload
+- Captures OBFS4 traffic (UDP port configured in `.env`)
 - Generates HTTP traffic through the VPN
 - Collects Suricata IDS alerts
 - Stores artifacts in `results/runs/obfs4/<timestamp>/`
@@ -282,10 +289,14 @@ To provide technical depth, focus on **Feature Engineering** using the generated
 To perform the analysis described above, use the provided Jupyter Notebook template:
 
 ### 1. Requirements
-Install the necessary python libraries:
+Create a virtual environment and install the necessary Python libraries:
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r analysis/requirements.txt
 ```
+> **Note:** Ubuntu 24.04+ requires a virtual environment for pip installs (PEP 668).
+> In VS Code, select the `.venv` kernel in the top-right corner of the notebook.
 
 ### 2. Running the Analysis
 OPEN the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
@@ -362,29 +373,35 @@ vpn-gateway (WireGuard UDP/51820)
 target-server (172.30.30.10)
 ```
 
-### Traffic Flow: OBFS4
+### Traffic Flow: OBFS4 (Shadowsocks-rust + obfs4proxy SIP003)
 ```text
 client-node (192.168.10.10)
-    ↓
+    ↓ (HTTP requests)
 wg-client (127.0.0.1:51820)
-    ↓
-obfs4-client (wraps UDP/51820 in OBFS4)
-    ↓ (OBFS4 protocol, TCP/${OBFS4_PORT})
+    ↓ (WireGuard UDP/51820 → loopback)
+obfs4-client [sslocal -U + pt_adapter.py + obfs4proxy]
+    ↓ (Shadowsocks ChaCha20 + obfs4 randomisation, UDP/${OBFS4_PORT})
 [client_net bridge] ← Suricata/Zeek capture point
-    ↓ (OBFS4 protocol)
-obfs4-gateway (unwraps OBFS4 → UDP/51820)
-    ↓
+    ↓ (obfuscated UDP)
+obfs4-gateway [ssserver + pt_adapter.py + obfs4proxy]
+    ↓ (unwraps obfs4 → decrypts Shadowsocks → UDP/51820)
 vpn-gateway (WireGuard UDP/51820)
     ↓
 target-server (172.30.30.10)
 ```
 
+> **Note:** Unlike standard Tor obfs4 (which uses TCP), this setup uses Shadowsocks-rust's
+> `-U` flag for UDP relay mode. The obfs4 obfuscation layer is applied via the SIP003 plugin
+> specification (`pt_adapter.py` bridges Shadowsocks ↔ obfs4proxy). The outer transport
+> visible on the wire is therefore **UDP**, not TCP.
+
 ### Design Rationale
 - **Separate compose files** ensure clarity: base + scenario-specific overrides
 - **Identical client-node** across all scenarios guarantees the same application traffic
 - **Automatic bridge detection** eliminates hardcoded interface names
-- **Passive Suricata IDS** captures traffic on the external_net bridge
-- **Zeek NSM** captures behavioral data (conn.log, etc.) on the external_net bridge
+- **Passive Suricata IDS** captures traffic on the external_net bridge (signature-based detection)
+- **Zeek NSM** captures behavioral data (conn.log, etc.) on the external_net bridge (flow analysis)
+- **nDPI** performs offline Deep Packet Inspection on the captured PCAP (protocol fingerprinting)
 - **tcpdump** captures raw packets independently of Suricata
 
 ---
@@ -394,10 +411,10 @@ target-server (172.30.30.10)
 ### Run with custom parameters
 ```bash
 # Generate 100 HTTP requests instead of 50
-HTTP_REQUESTS=100 bash scripts/run_baseline.sh
+HTTP_REQUESTS=100 bash scripts/run_scenario.sh baseline
 
 # Capture for longer (keep tcpdump running for 5 extra seconds after traffic)
-TCPDUMP_SECONDS_TAIL=5 bash scripts/run_baseline.sh
+TCPDUMP_SECONDS_TAIL=5 bash scripts/run_scenario.sh baseline
 ```
 
 ### Inspect container logs
@@ -431,7 +448,7 @@ If you see: `Bridge interface 'br-xxxx' not found on host`
 
 Run the experiment script again, or manually set `BRIDGE_IF`:
 ```bash
-BRIDGE_IF=br-a1b2c3d4e5f6 bash scripts/run_baseline.sh
+BRIDGE_IF=br-a1b2c3d4e5f6 bash scripts/run_scenario.sh baseline
 ```
 
 ### Suricata not starting
@@ -449,8 +466,9 @@ Ensure `BRIDGE_IF` is set correctly in `.env`.
 
 ### OBFS4 connection fails
 - Verify OBFS4 containers are running: `docker ps | grep obfs4`
-- Check logs: `docker logs obfs4-gateway` and `docker logs obfs4-client`
-- Verify obfs4proxy built successfully: `docker logs obfs4-gateway`
+- Check Shadowsocks + obfs4proxy logs: `docker logs obfs4-gateway` and `docker logs obfs4-client`
+- Verify the SIP003 plugin bridge (`pt_adapter.py`) started correctly in both containers
+- Ensure the obfs4 cert and shared password match between client and gateway
 
 ---
 

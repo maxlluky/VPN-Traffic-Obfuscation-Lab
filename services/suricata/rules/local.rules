@@ -1,8 +1,4 @@
-# Baseline: Detect WireGuard Traffic (UDP 51820)
-alert udp any any -> any 51820 (msg:"VPN-LAB WireGuard Traffic Detected"; sid:1000002; rev:1;)
-
-# UDP2RAW: Detect TCP 443 Traffic (Obfuscated)
-alert tcp any any -> any 443 (msg:"VPN-LAB UDP2RAW/HTTPS Traffic Detected"; sid:1000003; rev:1;)
-
-# OBFS4: Detect OBFS4 Traffic (TCP 12345)
-alert ip any any -> any 12345 (msg:"VPN-LAB OBFS4 Traffic Detected"; sid:1000004; rev:1;)
+# Local validation rule — triggers on ANY HTTP traffic regardless of direction.
+# Used by validate_ids.sh to prove the full Suricata alert pipeline works
+# (ET Open rules only match HOME_NET <-> EXTERNAL_NET, not HOME_NET <-> HOME_NET).
+alert http any any -> any any (msg:"LOCAL VALIDATION - HTTP Traffic Detected"; flow:established,to_server; sid:9999999; rev:1;)

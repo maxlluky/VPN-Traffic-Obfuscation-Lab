@@ -1,5 +1,38 @@
 # Lab Notes
 
+## 2026-03-16
+### Added
+- **nDPI Deep Packet Inspection (`lib.sh`):** `collect_artifacts()` now automatically runs `ndpiReader` against captured PCAPs, producing per-flow protocol classification (`flows.csv`) and a detection summary (`summary.txt`) as run artifacts. Protocol and version are also written into `metadata.json`.
+- **Analysis Notebook — nDPI Section (2b):** New section visualising nDPI protocol fingerprinting results per scenario — includes protocol classification bar chart and detection effectiveness matrix.
+
+### Changed
+- **Analysis Notebook — Detection Heatmap:** Switched from a global 0–100 colour scale to per-column normalisation. This ensures metrics with different ranges (nDPI 0–100%, Entropy Gap 6–8%) are visually distinguishable while raw values remain annotated.
+
+## 2026-03-15
+### Fixed
+- **Suricata Rule Configuration:** Changed `suricata.yaml` to load `suricata.rules` (ET Open ruleset, ~42,400 signatures) instead of only `local.rules` (3 custom port-based rules). Previous configuration meant Suricata was not using the ET Open ruleset for detection, undermining the thesis evaluation of signature-based IDS effectiveness.
+- **Custom Rules Removed:** Cleared `local.rules` of the three simplistic port-matching rules (SID 1000002–1000004) that triggered on any traffic to ports 51820, 443, and 12345 regardless of protocol content.
+- **Suricata Variable Definitions:** Added all required `port-groups` (`$HTTP_PORTS`, `$SSH_PORTS`, `$SHELLCODE_PORTS`, etc.) and `address-groups` (`$HTTP_SERVERS`, `$SMTP_SERVERS`, etc.) to `suricata.yaml`. Without these, ~6,700 ET Open rules silently failed to parse — raising active rules from ~42,400 to ~49,085. **All previous scenario runs had incomplete Suricata detection.**
+- **README OBFS4 Protocol Correction:** Fixed two references incorrectly stating OBFS4 uses TCP. The OBFS4 scenario uses **UDP** transport (shadowsocks-rust `-U` flag enables UDP relay mode via SIP003/obfs4proxy).
+- **README OBFS4 Architecture Documentation:** The README previously only mentioned "obfs4proxy" without explaining the full stack. Updated compose file descriptions, services directory listing, Scenario 3 details, traffic flow diagram, and troubleshooting section to clearly document that OBFS4 runs as a **Shadowsocks-rust SIP003 plugin** (`sslocal`/`ssserver` + `pt_adapter.py` + `obfs4proxy`) with ChaCha20-Poly1305 encryption over UDP.
+
+### Added
+- **IDS Validation Script (`scripts/validate_ids.sh`):** Positive control that sends plain HTTP traffic to prove Suricata and Zeek are functional. Validates that the absence of alerts in VPN scenarios is a genuine finding, not a tool misconfiguration.
+- **Suricata Engine Readiness Wait (`lib.sh`):** Added `wait_for_suricata()` function that polls for Suricata's "engine started" log message (up to 60s) before sending traffic. Integrated into `reset_ids_logs()` to prevent traffic generation before rule parsing completes.
+- **Cleanup Script (`scripts/cleanup.sh`):** New utility to tear down all Docker containers, networks, and volumes created by the lab. Supports `--all` flag to also remove built images.
+- **Analysis Notebook — Shannon Entropy (Section 6):** Per-packet entropy calculation from raw PCAP payloads via tshark. Includes KDE distribution plot and entropy-vs-packet-size scatter plot.
+- **Analysis Notebook — Descriptive Statistics & KS Tests (Section 7):** Packet size and IAT descriptive statistics (mean, median, std, IQR, percentiles). Pairwise Kolmogorov-Smirnov tests for packet size and IAT distributions across all scenarios.
+- **Analysis Notebook — Summary Table & Detection Heatmap (Section 8):** Consolidated results matrix (Scenario × Metric) for thesis evaluation chapter. Includes detection effectiveness heatmap.
+
+### Removed
+- **Wrapper Scripts:** Deleted `run_baseline.sh`, `run_obfs4.sh`, `run_udp2raw.sh`. All scenarios are now run exclusively via `scripts/run_scenario.sh <scenario>`.
+- **README:** Updated all references from deleted wrapper scripts to `run_scenario.sh`.
+
+### Changed
+- **Analysis Notebook — IAT Visualisation:** Replaced boxplot with violin plot for better distribution visibility.
+- **Analysis Notebook — Overview:** Corrected source count ("four" → "five"), added ET Open and Shannon Entropy references.
+- **Analysis Notebook — Protocol Plausibility:** Fixed SettingWithCopyWarning, added fallback message for scenarios without port 443 traffic.
+
 ## 2026-03-10
 ### Fixed
 - **Repository Setup (Fresh Clone):** Confirmed that `cp compose/.env.example compose/.env` is the only required manual step after cloning. All WireGuard key pairs were cryptographically verified (Curve25519) — all three scenarios correct.
