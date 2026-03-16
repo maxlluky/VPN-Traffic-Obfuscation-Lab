@@ -3,7 +3,7 @@
 </div>
 
 # VPN Obfuscation Lab (Bachelor Project)
-This repository contains a reproducible Docker-based testbed to evaluate the detectability of VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS.
+This repository contains a reproducible Docker-based testbed to evaluate the detectability of VPN traffic (baseline WireGuard) and VPN obfuscation techniques (e.g., obfs4, udp2raw) using Suricata IDS, Zeek NSM, and nDPI Deep Packet Inspection.
 
 
 ### Author Information
@@ -69,6 +69,7 @@ results/
     │       ├── pcap_features/  – Tshark-extracted packets.csv
     │       ├── suricata/       – IDS alerts (eve.json, fast.log)
     │       ├── zeek/           – Flow logs (conn.log)
+    │       ├── ndpi/           – DPI results (summary.txt, flows.csv)
     │       ├── iperf/          – (Streaming mode only) iperf.json
     │       └── metadata.json   – Run config: scenario, mode, seed, tool versions
     ├── udp2raw/        – UDP2RAW experiment results
@@ -174,7 +175,7 @@ bash scripts/run_scenario.sh baseline
 - Starts `compose/compose.yml` + `compose/compose.baseline.yml`
 - Captures UDP/51820 (WireGuard) packets
 - Generates HTTP traffic through the VPN
-- Collects Suricata IDS alerts
+- Collects Suricata IDS alerts, Zeek logs, and nDPI protocol classifications
 - Stores artifacts in `results/runs/baseline/<timestamp>/`
 
 **Output files:**
@@ -185,9 +186,12 @@ results/runs/baseline/<dd-mm-yyyy-hh-mm-ss>/
 ├── suricata/
 │   ├── eve.json          – Suricata alerts (JSON)
 │   └── fast.log          – Suricata alerts (Text)
-└── zeek/
-    ├── conn.log          – Connection logs
-    └── ...
+├── zeek/
+│   ├── conn.log          – Connection logs
+│   └── ...
+└── ndpi/
+    ├── summary.txt       – Protocol classification summary
+    └── flows.csv         – Per-flow DPI results
 ```
 
 ### Scenario 2: UDP2RAW Obfuscation
@@ -204,7 +208,7 @@ bash scripts/run_scenario.sh udp2raw
 - Client unwraps UDP ← TCP from the gateway
 - Captures TCP/443 packets
 - Generates HTTP traffic through the VPN
-- Collects Suricata IDS alerts
+- Collects Suricata IDS alerts, Zeek logs, and nDPI protocol classifications
 - Stores artifacts in `results/runs/udp2raw/<timestamp>/`
 
 **Network topology:**
@@ -227,7 +231,7 @@ bash scripts/run_scenario.sh obfs4
 - Traffic on the wire is **UDP** on port `${OBFS4_PORT}` (default 12345) with randomised obfs4 payload
 - Captures OBFS4 traffic (UDP port configured in `.env`)
 - Generates HTTP traffic through the VPN
-- Collects Suricata IDS alerts
+- Collects Suricata IDS alerts, Zeek logs, and nDPI protocol classifications
 - Stores artifacts in `results/runs/obfs4/<timestamp>/`
 
 ---
@@ -280,12 +284,18 @@ To provide technical depth, focus on **Feature Engineering** using the generated
     - `orig_bytes` / `resp_bytes`: Volume of data (Tunneling = high volume).
     - `duration`: Length of connection.
 
-**3. Entropy & Payload Analysis (PCAP)**
+**3. Deep Packet Inspection (nDPI)**
+- **Metric:** Protocol identification rate (percentage of flows correctly classified).
+- **Hypothesis:** nDPI identifies baseline WireGuard but fails on well-obfuscated traffic (obfs4). UDP2RAW may be misclassified as TLS.
+- **File:** `ndpi/summary.txt` and `ndpi/flows.csv`
+- **Key Fields:** Detected protocol name, confidence level, flow count per protocol.
+
+**4. Entropy & Payload Analysis (PCAP)**
 - **Metric:** Shannon Entropy of payload bytes.
 - **Hypothesis:** Encrypted WireGuard traffic has high entropy (close to 8.0). Obfuscated traffic (like obfs4) also has high entropy but attempts to look random.
 - **Tooling:** Use python `scapy` or `pandas` to calculate entropy on `pcap/` files.
 
-## 4. Analysis Implementation (Jupyter Notebook)
+## 5. Analysis Implementation (Jupyter Notebook)
 To perform the analysis described above, use the provided Jupyter Notebook template:
 
 ### 1. Requirements
@@ -303,9 +313,11 @@ OPEN the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
 The notebook performs the following:
 1.  **Loads Data:** Automatically discovers the latest runs in `results/runs/`.
 2.  **Suricata Plots:** Visualizes alert counts per scenario (to show efficacy of obfuscation).
-3.  **Zeek Flows:** Scans `conn.log` to identify tunnel characteristics (Duration vs Bytes).
-4.  **Entropy Calculation:** Parses `.pcap` files payload to compute Shannon Entropy.
-5.  **Packet Timing:** Analyzes Inter-Arrival Time (IAT) distribution on a logarithmic scale to detect machine-generated traffic patterns.
+3.  **nDPI Analysis:** Visualizes protocol fingerprinting results and identification rates per scenario.
+4.  **Zeek Flows:** Scans `conn.log` to identify tunnel characteristics (Duration vs Bytes).
+5.  **Entropy Calculation:** Parses `.pcap` files payload to compute Shannon Entropy.
+6.  **Packet Timing:** Analyzes Inter-Arrival Time (IAT) distribution on a logarithmic scale to detect machine-generated traffic patterns.
+7.  **Detection Heatmap:** Combined detection effectiveness matrix across all methods (per-column normalised).
 
 ---
 

@@ -3,10 +3,12 @@
 ## 2026-03-16
 ### Added
 - **nDPI Deep Packet Inspection (`lib.sh`):** `collect_artifacts()` now automatically runs `ndpiReader` against captured PCAPs, producing per-flow protocol classification (`flows.csv`) and a detection summary (`summary.txt`) as run artifacts. Protocol and version are also written into `metadata.json`.
-- **Analysis Notebook — nDPI Section (2b):** New section visualising nDPI protocol fingerprinting results per scenario — includes protocol classification bar chart and detection effectiveness matrix.
+- **Analysis Notebook, nDPI Section (2b):** New section visualising nDPI protocol fingerprinting results per scenario, includes protocol classification bar chart and detection effectiveness matrix.
+- **Thesis DPI Integration Guide (`docs/THESIS_DPI_INTEGRATION_GUIDE.md`):** Chapter-by-chapter reference for integrating DPI into the written thesis, including required source searches, new metrics, and effort estimates.
 
 ### Changed
-- **Analysis Notebook — Detection Heatmap:** Switched from a global 0–100 colour scale to per-column normalisation. This ensures metrics with different ranges (nDPI 0–100%, Entropy Gap 6–8%) are visually distinguishable while raw values remain annotated.
+- **Analysis Notebook, Detection Heatmap:** Switched from a global 0 to 100 colour scale to per-column normalisation. This ensures metrics with different ranges (nDPI 0 to 100%, Entropy Gap 6 to 8%) are visually distinguishable while raw values remain annotated.
+- **README:** Updated project description, artefact structure, scenario outputs, and analysis guide to reflect nDPI as the third detection layer alongside Suricata and Zeek.
 
 ## 2026-03-15
 ### Fixed
