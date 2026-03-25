@@ -144,6 +144,17 @@ reset_ids_logs() {
 
     # Wait for Suricata engine to fully initialise (rule parsing + capture ready)
     wait_for_suricata
+
+    # Brief wait for nDPI to attach to the interface (typically <1s)
+    log "Waiting for nDPI to start capturing..."
+    local ndpi_wait=10
+    for i in $(seq 1 "$ndpi_wait"); do
+        if docker logs ndpi-dpi 2>&1 | grep -qi "Starting ndpiReader"; then
+            log "nDPI ready after ${i}s."
+            break
+        fi
+        sleep 1
+    done
 }
 
 wait_for_suricata() {
