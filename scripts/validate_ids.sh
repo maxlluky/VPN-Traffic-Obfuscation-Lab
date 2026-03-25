@@ -2,12 +2,13 @@
 set -euo pipefail
 
 # scripts/validate_ids.sh
-# Positive control: proves Suricata & Zeek are functional by sending
+# Positive control: proves Suricata, Zeek & nDPI are functional by sending
 # plain (unencrypted) HTTP traffic across the monitored bridge interface.
 #
 # Expected outcome:
 #   - Suricata: ET Open HTTP alerts (e.g. ET POLICY, ET INFO)
 #   - Zeek:     conn.log entries with service="http"
+#   - nDPI:     Detected protocols (e.g. HTTP)
 #
 # This validates that the absence of alerts in VPN scenarios is a genuine
 # finding, not a tool misconfiguration.
@@ -92,17 +93,20 @@ stop_tcpdump "$TCPDUMP_PID"
 # ── Collect & Analyse ────────────────────────────────────────
 log "Collecting artifacts..."
 
-# Stop Suricata & Zeek to flush all logs to disk
+# Stop Suricata, Zeek & nDPI to flush all logs to disk
 docker stop suricata-ids >/dev/null 2>&1 || true
 docker stop zeek-nsm >/dev/null 2>&1 || true
+docker stop ndpi-dpi >/dev/null 2>&1 || true
 sleep 3
 
-mkdir -p "$RUN_DIR/pcap" "$RUN_DIR/suricata" "$RUN_DIR/zeek"
+mkdir -p "$RUN_DIR/pcap" "$RUN_DIR/suricata" "$RUN_DIR/zeek" "$RUN_DIR/ndpi"
 
 [ -f "$PCAP_FILE" ] && mv "$PCAP_FILE" "$RUN_DIR/pcap/"
 sudo cp "$FAST_LOG" "$RUN_DIR/suricata/fast.log" 2>/dev/null || true
 sudo cp "$EVE_LOG"  "$RUN_DIR/suricata/eve.json" 2>/dev/null || true
 sudo cp "$ZEEK_LOG_DIR"/*.log "$RUN_DIR/zeek/" 2>/dev/null || true
+sudo cp "$NDPI_LOG_DIR"/flows.csv  "$RUN_DIR/ndpi/" 2>/dev/null || true
+sudo cp "$NDPI_LOG_DIR"/summary.txt "$RUN_DIR/ndpi/" 2>/dev/null || true
 
 # ── Results ──────────────────────────────────────────────────
 log ""
@@ -111,18 +115,18 @@ log "  VALIDATION RESULTS"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Suricata alerts
-ALERT_COUNT=0
+log ""
+log "Suricata Alerts:"
 if [ -f "$RUN_DIR/suricata/eve.json" ]; then
-    ALERT_COUNT=$(python3 -c "
-import json
+    python3 -c "
+import json, sys
 alerts=[]
 with open('$RUN_DIR/suricata/eve.json') as f:
     for line in f:
         try:
             e=json.loads(line)
             if e.get('event_type')=='alert':
-                sig=e['alert']['signature']
-                alerts.append(sig)
+                alerts.append(e['alert']['signature'])
         except: pass
 seen=set()
 for a in alerts:
@@ -130,13 +134,8 @@ for a in alerts:
         print(f'    ✓ {a}')
         seen.add(a)
 print(f'  Total: {len(alerts)} alerts ({len(seen)} unique signatures)')
-" 2>/dev/null || echo "  (parse error)")
-fi
-
-log ""
-log "Suricata Alerts:"
-if [ "$ALERT_COUNT" = "0" ] 2>/dev/null; then
-    log "  ✗ No alerts — Suricata may not be detecting HTTP traffic"
+sys.exit(0 if alerts else 1)
+" 2>/dev/null || log "  ✗ No alerts — Suricata may not be detecting HTTP traffic"
 fi
 
 # Suricata packet stats
@@ -179,6 +178,30 @@ print(f'  Total: {len(flows)} flows')
 " 2>/dev/null || echo "  (parse error)"
 else
     log "  ✗ No conn.log found"
+fi
+
+# nDPI protocols
+log ""
+log "nDPI Protocol Detection:"
+if [ -f "$RUN_DIR/ndpi/summary.txt" ]; then
+    python3 -c "
+import sys
+with open('$RUN_DIR/ndpi/summary.txt') as f:
+    lines = f.readlines()
+in_protos = False
+for line in lines:
+    if 'Detected protocols:' in line:
+        in_protos = True
+        continue
+    if in_protos and line.strip():
+        parts = line.strip().split()
+        if parts:
+            print(f'    > {line.strip()}')
+    elif in_protos and not line.strip():
+        break
+" 2>/dev/null || log "  (parse error)"
+else
+    log "  - No nDPI summary found"
 fi
 
 # PCAP packet count

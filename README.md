@@ -16,11 +16,17 @@ This repository contains a reproducible Docker-based testbed to evaluate the det
 ## Table of Contents
 1. [Project Structure](#project-structure)
 2. [Quickstart](#quickstart)
-3. [Scenarios](#scenarios)
-4. [Inspecting Results](#inspecting-results)
-5. [Architecture](#architecture)
-6. [Future Work](#future-work--advanced-extensions)
-7. [License & Copyright](#copyright)
+3. [Traffic Modes](#traffic-modes)
+4. [Scenarios](#scenarios)
+5. [IDS Validation](#ids-validation)
+6. [Inspecting Results](#inspecting-results)
+7. [Analysis (Jupyter Notebook)](#analysis-jupyter-notebook)
+8. [Cleanup](#cleanup)
+9. [Architecture](#architecture)
+10. [Advanced Usage](#advanced-usage)
+11. [Troubleshooting](#troubleshooting)
+12. [Future Work](#future-work--advanced-extensions)
+13. [License & Copyright](#copyright)
 
 ---
 
@@ -30,10 +36,21 @@ This repository contains a reproducible Docker-based testbed to evaluate the det
 ### Docker Compose Files (`compose/`)
 The project uses **multiple compose files** for clarity and modularity, located in the `compose/` directory:
 
-- `compose/compose.yml` – Base configuration (target, suricata, networks)
+- `compose/compose.yml` – Base configuration (target, suricata, zeek, ndpi, networks)
 - `compose/compose.baseline.yml` – Baseline scenario: plain WireGuard
 - `compose/compose.udp2raw.yml` – UDP2RAW obfuscation: WireGuard wrapped in TCP/443
 - `compose/compose.obfs4.yml` – OBFS4 obfuscation: WireGuard wrapped via Shadowsocks-rust + obfs4proxy (SIP003 plugin)
+- `compose/compose.validate.yml` – IDS validation: plain HTTP (no VPN) for positive control
+
+### Scripts (`scripts/`)
+```text
+scripts/
+├── run_scenario.sh        – Main experiment runner (all scenarios + traffic modes)
+├── lib.sh                 – Shared functions (stack management, capture, artifact collection)
+├── validate_ids.sh        – Detection positive control (proves Suricata, Zeek & nDPI are functional)
+├── cleanup.sh             – Tears down all Docker containers, networks, and volumes
+└── pcap_to_packet_csv.sh  – Internal: extracts packet features from PCAP via tshark
+```
 
 ### Services Directory
 ```text
@@ -54,26 +71,29 @@ services/
 ├── proxy-obfs4/          – Shadowsocks-rust + obfs4proxy via SIP003 plugin bridge (pt_adapter.py)
 ├── proxy-udp2raw/        – UDP2RAW proxy (Dockerfile)
 ├── suricata/             – IDS (uses suricata-update)
-└── zeek/                 – NSM (JSON logging)
+├── zeek/                 – NSM (JSON logging)
+└── ndpi/                 – DPI (nDPI 5.0, built from source)
 ```
 
 ### Results & Artifacts
 ```text
 results/
-├── suricata-alerts/    – Real-time IDS outputs (eve.json, fast.log)
+├── suricata-alerts/    – Real-time Suricata outputs (eve.json, fast.log)
 ├── zeek-logs/          – Real-time Zeek JSON logs (conn.log, etc.)
+├── ndpi-results/       – Real-time nDPI outputs (summary.txt, flows.csv)
 └── runs/
     ├── baseline/       – Baseline experiment results per timestamp
     │   └── <timestamp>/
+    │       ├── metadata.json   – Run config: scenario, mode, seed, tool versions
     │       ├── pcap/           – Captured PCAP
     │       ├── pcap_features/  – Tshark-extracted packets.csv
     │       ├── suricata/       – IDS alerts (eve.json, fast.log)
     │       ├── zeek/           – Flow logs (conn.log)
     │       ├── ndpi/           – DPI results (summary.txt, flows.csv)
-    │       ├── iperf/          – (Streaming mode only) iperf.json
-    │       └── metadata.json   – Run config: scenario, mode, seed, tool versions
+    │       └── iperf/          – (Streaming mode only) iperf.json
     ├── udp2raw/        – UDP2RAW experiment results
-    └── obfs4/          – OBFS4 experiment results
+    ├── obfs4/          – OBFS4 experiment results
+    └── validation/     – IDS validation results
 ```
 
 ### Analysis Tools (`analysis/`)
@@ -92,14 +112,14 @@ Contains Jupyter Notebooks for deep traffic inspection:
 4. Kernel support for WireGuard (`wireguard`, `udp_tunnel`)
 
 5. `bash`, `tcpdump`, `tshark` (required for packet capture and feature extraction)
-6. `ndpiReader` (required for Deep Packet Inspection analysis)
    ```bash
    # Ubuntu/Debian
-   sudo apt install tcpdump tshark libndpi-bin
+   sudo apt install tcpdump tshark
 
    # Arch Linux
-   sudo pacman -S tcpdump wireshark-cli ndpi
+   sudo pacman -S tcpdump wireshark-cli
    ```
+   > **Note:** nDPI (Deep Packet Inspection) runs as a Docker container — no host installation required.
 
 **Verify Docker:**
 ```bash
@@ -107,13 +127,13 @@ docker --version
 docker compose version
 ```
 
-### 1️⃣ Clone the repository
+### 1. Clone the repository
 ```bash
 git clone https://github.com/maxlluky/VPN-Traffic-Obfuscation-Lab.git
 cd VPN-Traffic-Obfuscation-Lab
 ```
 
-### 2️⃣ Prepare environment variables
+### 2. Prepare environment variables
 ```bash
 cp compose/.env.example compose/.env
 ```
@@ -122,9 +142,9 @@ Edit `compose/.env` if required. Key variables:
 - `ALPINE_TAG`: Use a valid Alpine version (e.g., `3.23`). Ensure the tag exists on Docker Hub.
 - `BRIDGE_IF`: Docker bridge interface (auto-detected by scripts, default `br-xxxxxxxxxxxx` in .env is fine).
 
-> ⚠️ Do not commit `compose/.env` — it may contain system-specific configuration.
+> Do not commit `compose/.env` — it may contain system-specific configuration.
 
-### 3️⃣ Setup WireGuard Configurations
+### 3. Setup WireGuard Configurations
 **Note:** The `wg0.conf` configuration files are now included in the repository for the lab environment. You generally **do not** need to copy templates unless you want to generate new keys.
 
 If you *do* need to reset keys:
@@ -140,10 +160,22 @@ If you *do* need to reset keys:
 
    *Note: Ensure `AllowedIPs` in the client configs matches the lab network (e.g., `172.30.30.0/24`) and the `Endpoint` points to the correct gateway (192.168.10.2:51820 for baseline) or the local tunnel (127.0.0.1:51820 for obfuscated scenarios).*
 
+### 4. Validate IDS Setup
+Before running experiments, verify that Suricata, Zeek and nDPI are working correctly:
+```bash
+bash scripts/validate_ids.sh
+```
+This sends plain HTTP traffic (no VPN) and checks for expected alerts. If Suricata reports alerts, Zeek detects HTTP flows, and nDPI identifies HTTP protocol, the detection stack is functional.
+
+### 5. Run your first experiment
+```bash
+bash scripts/run_scenario.sh baseline
+```
+
 ---
 
 ## Traffic Modes
-The experiment scripts support two traffic generation modes, controlled via the `TRAFFIC_MODE` environment variable:
+The experiment scripts support two traffic generation modes, controlled via the second positional argument:
 
 *   **Burst Mode (Default):** Generates 50 sequential HTTP requests (simulating web measurement). Good for testing connectivity and quick alert generation.
 *   **Streaming Mode:** Generates a continuous TCP stream for 60 seconds using `iperf3`. Essential for **Long Flow** analysis (Zeek) and connection duration metrics.
@@ -154,19 +186,20 @@ The experiment scripts support two traffic generation modes, controlled via the 
 bash scripts/run_scenario.sh baseline
 
 # Streaming (Recommended for Analysis)
-TRAFFIC_MODE=streaming bash scripts/run_scenario.sh baseline
+bash scripts/run_scenario.sh baseline streaming
 
-# Run all scenarios sequentially
+# Run all scenarios sequentially (both modes)
 for scenario in baseline udp2raw obfs4; do
   bash scripts/run_scenario.sh "$scenario"
+  bash scripts/run_scenario.sh "$scenario" streaming
 done
 ```
+
+---
 
 ## Scenarios
 
 ### Scenario 1: Baseline (Plain WireGuard)
-Run the baseline WireGuard experiment without obfuscation:
-
 ```bash
 bash scripts/run_scenario.sh baseline
 ```
@@ -181,22 +214,25 @@ bash scripts/run_scenario.sh baseline
 **Output files:**
 ```text
 results/runs/baseline/<dd-mm-yyyy-hh-mm-ss>/
+├── metadata.json         – Run config: scenario, mode, seed, tool versions
 ├── pcap/
 │   └── wg-baseline.pcap  – Captured traffic
+├── pcap_features/
+│   └── packets.csv       – Tshark-extracted packet features
 ├── suricata/
 │   ├── eve.json          – Suricata alerts (JSON)
 │   └── fast.log          – Suricata alerts (Text)
 ├── zeek/
 │   ├── conn.log          – Connection logs
 │   └── ...
-└── ndpi/
-    ├── summary.txt       – Protocol classification summary
-    └── flows.csv         – Per-flow DPI results
+├── ndpi/
+│   ├── summary.txt       – Protocol classification summary
+│   └── flows.csv         – Per-flow DPI results
+└── iperf/                – (Streaming mode only)
+    └── iperf.json        – iperf3 throughput results
 ```
 
 ### Scenario 2: UDP2RAW Obfuscation
-Run the UDP2RAW obfuscation experiment (WireGuard wrapped in TCP/443):
-
 ```bash
 bash scripts/run_scenario.sh udp2raw
 ```
@@ -217,8 +253,6 @@ bash scripts/run_scenario.sh udp2raw
 ```
 
 ### Scenario 3: OBFS4 Obfuscation
-Run the OBFS4 obfuscation experiment:
-
 ```bash
 bash scripts/run_scenario.sh obfs4
 ```
@@ -236,6 +270,28 @@ bash scripts/run_scenario.sh obfs4
 
 ---
 
+## IDS Validation
+Before drawing conclusions from experiment results, run the **positive control** to prove that Suricata, Zeek and nDPI are functional:
+
+```bash
+bash scripts/validate_ids.sh
+```
+
+**What it does:**
+- Starts a minimal stack (Alpine HTTP client + target server, no VPN)
+- Sends plain HTTP requests designed to trigger ET Open signatures (curl/wget/Python user-agents, `.exe`/`.bat`/`.ps1` downloads)
+- Reports Suricata alerts, Zeek service detections, and nDPI protocol classifications
+- Stores artifacts in `results/runs/validation/<timestamp>/`
+
+**Expected outcome:**
+- Suricata: Multiple ET POLICY / ET INFO alerts
+- Zeek: `conn.log` entries with `service="http"`
+- nDPI: Detected protocols including HTTP
+
+This validates that the **absence of alerts in VPN scenarios is a genuine finding**, not a tool misconfiguration.
+
+---
+
 ## Inspecting Results
 
 ### View Suricata Alerts (JSON)
@@ -245,26 +301,28 @@ jq '.alert | {timestamp, signature, severity}' results/suricata-alerts/eve.json
 
 ### View Suricata Fast Alerts (Text)
 ```bash
-cat results/runs/baseline/<timestamp>/fast.log
+cat results/runs/baseline/<timestamp>/suricata/fast.log
 ```
 
 ### Analyze pcap with Wireshark
 ```bash
-wireshark results/runs/baseline/<timestamp>/wg-baseline.pcap &
+wireshark results/runs/baseline/<timestamp>/pcap/wg-baseline.pcap &
 ```
 
 ### Compare scenarios
 ```bash
 # Count alerts per scenario
 for scenario in baseline udp2raw obfs4; do
-  count=$(jq '[.alert] | length' results/runs/$scenario/*/eve.json | tr -d '\n' | xargs)
+  count=$(jq '[.alert] | length' results/runs/$scenario/*/suricata/eve.json | tr -d '\n' | xargs)
   echo "$scenario: $count alerts"
 done
 ```
 
 ---
 
-## Analysis Guide for Bachelor Thesis
+## Analysis (Jupyter Notebook)
+
+### Analysis Guide for Bachelor Thesis
 To provide technical depth, focus on **Feature Engineering** using the generated artifacts:
 
 **1. Signature-Based Detection (Suricata)**
@@ -295,10 +353,7 @@ To provide technical depth, focus on **Feature Engineering** using the generated
 - **Hypothesis:** Encrypted WireGuard traffic has high entropy (close to 8.0). Obfuscated traffic (like obfs4) also has high entropy but attempts to look random.
 - **Tooling:** Use python `scapy` or `pandas` to calculate entropy on `pcap/` files.
 
-## 5. Analysis Implementation (Jupyter Notebook)
-To perform the analysis described above, use the provided Jupyter Notebook template:
-
-### 1. Requirements
+### Requirements
 Create a virtual environment and install the necessary Python libraries:
 ```bash
 python3 -m venv .venv
@@ -308,8 +363,8 @@ pip install -r analysis/requirements.txt
 > **Note:** Ubuntu 24.04+ requires a virtual environment for pip installs (PEP 668).
 > In VS Code, select the `.venv` kernel in the top-right corner of the notebook.
 
-### 2. Running the Analysis
-OPEN the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
+### Running the Analysis
+Open the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
 The notebook performs the following:
 1.  **Loads Data:** Automatically discovers the latest runs in `results/runs/`.
 2.  **Suricata Plots:** Visualizes alert counts per scenario (to show efficacy of obfuscation).
@@ -323,20 +378,15 @@ The notebook performs the following:
 
 ## Cleanup
 
-### Stop current stack
+### Quick: Stop current stack
 ```bash
-docker compose -f compose/compose.yml -f compose/compose.baseline.yml down
-# or
-docker compose -f compose/compose.yml -f compose/compose.udp2raw.yml down
-# or
-docker compose -f compose/compose.yml -f compose/compose.obfs4.yml down
+bash scripts/cleanup.sh
 ```
+This tears down all Docker containers, networks, and volumes created by the lab.
 
-### Remove all containers and networks
+### Full: Also remove built images
 ```bash
-docker compose -f compose/compose.yml -f compose/compose.baseline.yml down -v
-docker compose -f compose/compose.yml -f compose/compose.udp2raw.yml down -v
-docker compose -f compose/compose.yml -f compose/compose.obfs4.yml down -v
+bash scripts/cleanup.sh --all
 ```
 
 ### Clean experiment results (optional)
@@ -376,7 +426,7 @@ wg-client (127.0.0.1:51820)
     ↓
 udp2raw-client (unwraps TCP/443 → UDP/51820)
     ↓ (TCP/443)
-[client_net bridge] ← Suricata/Zeek capture point
+[client_net bridge] ← Suricata/Zeek/nDPI capture point
     ↓ (TCP/443)
 udp2raw-gateway (wraps TCP/443 → UDP/51820)
     ↓
@@ -393,7 +443,7 @@ wg-client (127.0.0.1:51820)
     ↓ (WireGuard UDP/51820 → loopback)
 obfs4-client [sslocal -U + pt_adapter.py + obfs4proxy]
     ↓ (Shadowsocks ChaCha20 + obfs4 randomisation, UDP/${OBFS4_PORT})
-[client_net bridge] ← Suricata/Zeek capture point
+[client_net bridge] ← Suricata/Zeek/nDPI capture point
     ↓ (obfuscated UDP)
 obfs4-gateway [ssserver + pt_adapter.py + obfs4proxy]
     ↓ (unwraps obfs4 → decrypts Shadowsocks → UDP/51820)
@@ -411,9 +461,9 @@ target-server (172.30.30.10)
 - **Separate compose files** ensure clarity: base + scenario-specific overrides
 - **Identical client-node** across all scenarios guarantees the same application traffic
 - **Automatic bridge detection** eliminates hardcoded interface names
-- **Passive Suricata IDS** captures traffic on the external_net bridge (signature-based detection)
-- **Zeek NSM** captures behavioral data (conn.log, etc.) on the external_net bridge (flow analysis)
-- **nDPI** performs offline Deep Packet Inspection on the captured PCAP (protocol fingerprinting)
+- **Passive Suricata IDS** captures traffic on the client_net bridge (signature-based detection)
+- **Zeek NSM** captures behavioral data (conn.log, etc.) on the client_net bridge (flow analysis)
+- **nDPI DPI** captures traffic on the client_net bridge (protocol fingerprinting via deep packet inspection)
 - **tcpdump** captures raw packets independently of Suricata
 
 ---

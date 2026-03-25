@@ -1,5 +1,59 @@
 # Lab Notes
 
+## 2026-03-25
+### Added
+- **nDPI Live Container (`services/ndpi/`):** nDPI now runs as a live Docker container alongside Suricata and Zeek on the bridge interface, replacing the previous offline `ndpiReader` host invocation. Built from source (nDPI 5.0) using a multi-stage Alpine build (~42 MB image). All three detection tools now share the same live capture architecture.
+    - New `services/ndpi/Dockerfile` — multi-stage Alpine build compiling nDPI 5.0 from source.
+    - New `services/ndpi/entrypoint.sh` — writes version metadata, starts `ndpiReader` in live capture mode. Translates SIGTERM→SIGINT via trap so `docker stop` triggers a clean flush of summary and flow data (ndpiReader ignores SIGTERM but responds to SIGINT).
+    - New `ndpi` service in `compose/compose.yml` — host networking, `NET_ADMIN`/`NET_RAW` capabilities, logs to `results/ndpi-results/`.
+    - `lib.sh`: Added `NDPI_LOG_DIR`, updated `reset_ids_logs()` and `collect_artifacts()` to manage nDPI container lifecycle and collect live results.
+    - `validate_ids.sh`: Updated to stop nDPI container, collect and display nDPI protocol detection results.
+    - `ndpiReader` no longer required on the host — removed from README prerequisites.
+
+### Fixed
+- **Suricata `EXTERNAL_NET` Configuration (`suricata.yaml`):** Changed `EXTERNAL_NET` from `"!$HOME_NET"` to `"any"`. In the lab topology all traffic runs between private IPs (192.168.10.x ↔ 192.168.10.x), which are all in `HOME_NET`. ET Open rules matching `$HOME_NET -> $EXTERNAL_NET` could never fire because `EXTERNAL_NET` excluded all private ranges. With `"any"`, rules now match regardless of IP scope. **All previous runs were affected — rules that should have matched HOME→HOME traffic were silently skipped.**
+- **`validate_ids.sh` Alert Display Bug:** Alert signatures were captured into a variable but never printed to the terminal. Additionally, the "no alerts" check compared the formatted text output to `"0"`, which never matched. Replaced with direct stdout output from Python and `sys.exit(1)` to trigger the warning on zero alerts.
+- **`metadata.json` Not Generated (SIGPIPE crash):** `ndpiReader --version` outputs a large help text; `head -1` closed the pipe, causing SIGPIPE (exit 141) which `set -euo pipefail` treated as fatal. All code after this line was silently skipped. Fixed by extracting the version from the already-written `summary.txt` instead.
+- **`vpn-client/Dockerfile` Unpinned Alpine:** Used `alpine:latest` instead of `alpine:${ALPINE_TAG}`. Now pinned via build arg for reproducibility.
+- **Suricata Dockerfile Unpinned Base Image:** Used `jasonish/suricata:latest` instead of `${SURICATA_IMAGE}` from `.env`. Now uses `ARG SURICATA_IMAGE` for version pinning.
+- **Unused `OBFS4_IMAGE` in `.env`:** Removed — obfs4 containers are built locally, this variable was never referenced.
+- **Analysis Notebook `flows.csv` Delimiter:** Added explicit `sep='|'` to `pd.read_csv()` for nDPI flows.csv parsing. ndpiReader uses pipe delimiters, not commas — previously worked by coincidence but was fragile.
+
+### Changed
+- **`run_scenario.sh` Terminal Banner:** Added visual header (scenario, traffic mode, run directory) and footer (completion summary) using box-drawing characters, consistent with `validate_ids.sh` style.
+- **README Overhaul:** Restructured and expanded documentation:
+    - Added `scripts/` directory listing with all scripts and their purpose.
+    - Added dedicated **IDS Validation** section documenting `validate_ids.sh` usage and expected outcomes.
+    - Replaced manual `docker compose down` instructions in **Cleanup** section with `scripts/cleanup.sh` usage.
+    - Added `compose.validate.yml` to compose file listing.
+    - Added `validation/` to results directory tree.
+    - Updated Table of Contents to match new section structure.
+    - Corrected Suricata/Zeek capture point references from "external_net" to "client_net" in Design Rationale.
+    - Fixed file paths in "Inspecting Results" examples (added `suricata/` and `pcap/` subdirectories).
+
+## 2026-03-24
+### Changed
+- **`run_scenario.sh` CLI:** Traffic mode is now accepted as an optional second positional argument (`bash scripts/run_scenario.sh baseline streaming`) instead of requiring an environment variable prefix (`TRAFFIC_MODE=streaming`). The environment variable is still supported as a fallback for backwards compatibility.
+- **`run_scenario.sh` Output:** Now displays the active traffic mode (`burst` / `streaming`) alongside the scenario label at startup.
+- **`run_scenario.sh` COMPOSE_OVERRIDE:** All three scenarios (including baseline) now consistently allow override via the `COMPOSE_OVERRIDE` environment variable.
+- **README:** Updated usage examples, Traffic Modes description, and output file tree to reflect new CLI syntax and complete artifact structure (added `metadata.json`, `pcap_features/`, `iperf/`).
+- **`iperf_output.json` Path:** iperf3 results are now written directly to `$RUN_DIR/iperf/iperf.json` during traffic generation instead of being temporarily placed in the repository root and moved later.
+
+### Added
+- **`print_progress()` Helper (`lib.sh`):** Unified progress bar function used by both streaming and packet extraction. Uses ANSI `\033[2K` line-clear escape, 30-char bar width (fits 80-column terminals), and 0–100% clamping.
+- **`extract_packet_features()` Function (`lib.sh`):** Extracted PCAP feature extraction into its own function with progress bar. Uses `capinfos` for fast packet counting (header-only read) with `tshark` fallback.
+
+### Fixed
+- **`metadata.json` nDPI Fields Always "N/A":** `metadata.json` was generated before nDPI analysis ran, so `ndpi_protocol` and nDPI version were always "N/A". Moved metadata generation to the end of `collect_artifacts()`, after all data is available.
+- **Suricata Version Always "Unknown":** Version was queried after the container was already stopped. Moved version detection before `docker stop`.
+- **Progress Bar Line Duplication:** Both streaming and packet extraction progress bars created new lines instead of updating in-place. Root causes: (1) background `pcap_to_packet_csv.sh` echo output interleaved with `\r` overwrites, (2) progress bar lines exceeded 80 columns causing terminal wraps. Fixed by suppressing background script output (`>/dev/null 2>&1`) and reducing bar width from 50 to 30 characters.
+- **Streaming Progress Bar Dead Code:** The `if docker exec ... & then / else` pattern always succeeded (backgrounding returns 0), making the `else` branch unreachable. Replaced with direct backgrounding and `wait || log WARNING`.
+- **`detect_network_info()` Used Global Instead of Parameter:** Target IP resolution used `$TARGET_CONTAINER` (global) instead of `$target_container` (function parameter). Fixed to use the local parameter consistently.
+
+### Removed
+- **Redundant `run_info.json`:** Removed from `run_scenario.sh`. The same data (`traffic_mode`) is already written to `metadata.json`.
+- **Redundant `TRAFFIC_MODE` Default in `lib.sh`:** Removed fallback assignment in `generate_traffic()` since `run_scenario.sh` already validates and exports the variable.
+
 ## 2026-03-16
 ### Added
 - **nDPI Deep Packet Inspection (`lib.sh`):** `collect_artifacts()` now automatically runs `ndpiReader` against captured PCAPs, producing per-flow protocol classification (`flows.csv`) and a detection summary (`summary.txt`) as run artifacts. Protocol and version are also written into `metadata.json`.

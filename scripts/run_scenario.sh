@@ -3,26 +3,34 @@ set -euo pipefail
 
 # scripts/run_scenario.sh
 # Unified runner for all VPN obfuscation scenarios.
-# Usage: bash scripts/run_scenario.sh <scenario>
+# Usage: bash scripts/run_scenario.sh <scenario> [mode]
 # Scenarios: baseline, udp2raw, obfs4
+# Modes:     burst (default), streaming
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# ── Input validation ─────────────────────────────────────────────
 SCENARIO="${1:-}"
+TRAFFIC_MODE="${2:-${TRAFFIC_MODE:-burst}}"
+export TRAFFIC_MODE
 
 if [[ -z "$SCENARIO" ]]; then
-    die "Usage: $0 <scenario>  (baseline | udp2raw | obfs4)"
+    die "Usage: $0 <scenario> [mode]  (scenario: baseline | udp2raw | obfs4, mode: burst | streaming)"
+fi
+
+if [[ "$TRAFFIC_MODE" != "burst" && "$TRAFFIC_MODE" != "streaming" ]]; then
+    die "Unknown traffic mode: '$TRAFFIC_MODE'. Use: burst | streaming"
 fi
 
 setup_common_vars
 
-# ── Scenario-specific configuration ────────────────────────────────
+# ── Scenario-specific configuration ──────────────────────────────
 case "$SCENARIO" in
     baseline)
         SNIFF_KEY="${SNIFF_KEY:-client_net}"
         PCAP_NAME="wg-baseline.pcap"
         TCPDUMP_FILTER="udp port 51820"
-        COMPOSE_OVERRIDE="$REPO_ROOT/compose/compose.baseline.yml"
+        COMPOSE_OVERRIDE="${COMPOSE_OVERRIDE:-$REPO_ROOT/compose/compose.baseline.yml}"
         TUNNEL_WAIT=0
         SCENARIO_LABEL="Baseline: Plain WireGuard (no obfuscation)"
         ;;
@@ -48,21 +56,25 @@ case "$SCENARIO" in
         ;;
 esac
 
-# ── Common setup ──────────────────────────────────────────────────
+# ── Common setup ─────────────────────────────────────────────────
 TS="$(date -u +"%d-%m-%Y-%H-%M-%S")"
 RUN_DIR="$REPO_ROOT/results/runs/$SCENARIO/$TS"
 PCAP_FILE="$RUN_DIR/$PCAP_NAME"
 
 mkdir -p "$RUN_DIR"
-echo "{\"traffic_mode\": \"${TRAFFIC_MODE:-burst}\"}" > "$RUN_DIR/run_info.json"
 check_docker
 
 COMPOSE_FLAGS="--env-file $REPO_ROOT/compose/.env -f $COMPOSE_BASE -f $COMPOSE_OVERRIDE"
 
-log "Scenario:      $SCENARIO_LABEL"
-log "Run directory:  $RUN_DIR"
+log ""
+log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+log "  Scenario:       $SCENARIO_LABEL"
+log "  Traffic mode:   $TRAFFIC_MODE"
+log "  Run directory:  $RUN_DIR"
+log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+log ""
 
-# ── Execution ─────────────────────────────────────────────────────
+# ── Execution ────────────────────────────────────────────────────
 export SCENARIO
 
 start_stack "$COMPOSE_FLAGS"
@@ -77,11 +89,15 @@ fi
 
 start_tcpdump "$BRIDGE_IF" "$TCPDUMP_FILTER" "$PCAP_FILE"
 
-generate_traffic "$CLIENT_CONTAINER" "$TARGET_IP" "$TARGET_PORT" "$HTTP_REQUESTS"
+generate_traffic "$CLIENT_CONTAINER" "$TARGET_IP" "$TARGET_PORT" "$HTTP_REQUESTS" "$RUN_DIR"
 
 sleep "$TCPDUMP_SECONDS_TAIL"
 stop_tcpdump "$TCPDUMP_PID"
 
 collect_artifacts "$RUN_DIR" "$PCAP_FILE"
 
-log "Done."
+log ""
+log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+log "  Run complete: $SCENARIO ($TRAFFIC_MODE)"
+log "  Artifacts:    $RUN_DIR"
+log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
