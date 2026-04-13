@@ -1,4 +1,4 @@
-ARG ALPINE_TAG=3.23.2
+ARG ALPINE_TAG=3.23
 FROM alpine:${ALPINE_TAG}
 
 # Install obfs4proxy and dependencies

@@ -1,8 +1,0 @@
-.ipynb_checkpoints/
-__pycache__/
-*.pyc
-.venv/
-env/
-*.csv
-*.png
-!logo.png

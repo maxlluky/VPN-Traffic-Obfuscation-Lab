@@ -56,8 +56,9 @@ scripts/
 ```text
 services/
 ├── traffic-client/       – Traffic generator (Python script, curl, iperf)
-├── target-server/        – Nginx with static assets
+├── target-server/        – Nginx + iperf3 server (pre-installed in Dockerfile)
 │   └── html/
+├── http-client/          – Validation HTTP client (curl/bind-tools, pre-installed in Dockerfile)
 ├── vpn-server/           – WireGuard server configurations
 │   ├── baseline/         – Standard MTU config
 │   ├── udp2raw/          – Low MTU + sidecar entrypoint.sh
@@ -188,9 +189,11 @@ bash scripts/run_scenario.sh baseline
 # Streaming (Recommended for Analysis)
 bash scripts/run_scenario.sh baseline streaming
 
-# Run all scenarios sequentially (both modes)
+# Run all scenarios sequentially — 1× burst + 2× streaming each (9 runs total)
+# Two streaming runs per scenario provide mean ± 95 % CI throughput statistics (t-distribution).
 for scenario in baseline udp2raw obfs4; do
-  bash scripts/run_scenario.sh "$scenario"
+  bash scripts/run_scenario.sh "$scenario" burst
+  bash scripts/run_scenario.sh "$scenario" streaming
   bash scripts/run_scenario.sh "$scenario" streaming
 done
 ```
@@ -329,7 +332,11 @@ To provide technical depth, focus on **Feature Engineering** using the generated
 - **Metric:** Alert Count & Signature ID.
 - **Hypothesis:** Baseline triggers WireGuard signatures; Obfuscated scenarios trigger 0 alerts or generic "TCP" alerts.
 - **File:** `suricata/eve.json`
-- **Key Fields:** `alert.signature`, `alert.category`, `payload_printable`.
+- **Key Fields:** `alert.signature`, `alert.category`, `alert.signature_id`, `payload_printable`.
+- **Rule sets loaded:** ET Open (~49 k rules) **+** custom behavioral rules in `services/suricata/rules/local.rules`:
+  - SID 9000001 — WireGuard Handshake Initiator: UDP, exact payload 148 B, first 4 bytes `01 00 00 00`
+  - SID 9000002 — WireGuard Handshake Response: UDP, exact payload 92 B, first 4 bytes `02 00 00 00`
+  These rules detect WireGuard by **packet structure**, not by port number, providing a realistic baseline for behavioral detection.
 
 **2. Flow Analysis (Zeek)**
 - **Metric:** Flow Duration, Bytes Transferred (Ratio), inter-arrival times.
@@ -366,13 +373,15 @@ pip install -r analysis/requirements.txt
 ### Running the Analysis
 Open the file `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab.
 The notebook performs the following:
-1.  **Loads Data:** Automatically discovers the latest runs in `results/runs/`.
-2.  **Suricata Plots:** Visualizes alert counts per scenario (to show efficacy of obfuscation).
+1.  **Loads Data:** Automatically discovers all runs in `results/runs/`.
+2.  **Suricata Plots:** Visualizes alert counts per scenario, with a stacked breakdown of ET Open vs. custom WireGuard behavioral rule hits (SID 9000001/9000002).
 3.  **nDPI Analysis:** Visualizes protocol fingerprinting results and identification rates per scenario.
 4.  **Zeek Flows:** Scans `conn.log` to identify tunnel characteristics (Duration vs Bytes).
-5.  **Entropy Calculation:** Parses `.pcap` files payload to compute Shannon Entropy.
-6.  **Packet Timing:** Analyzes Inter-Arrival Time (IAT) distribution on a logarithmic scale to detect machine-generated traffic patterns.
-7.  **Detection Heatmap:** Combined detection effectiveness matrix across all methods (per-column normalised).
+5.  **Performance (Statistics):** For scenarios run in streaming mode more than once, shows **mean ± 95 % confidence interval** throughput and relative overhead. Individual measurements are overlaid as scatter points. The CI uses the t-distribution (`scipy.stats.t.ppf(0.975, df=n−1)`) rather than the z-approximation, so it is statistically correct for small n (with n = 2 the critical value is 12.706, not 1.96).
+6.  **Entropy Calculation:** Parses `.pcap` files payload to compute Shannon Entropy.
+7.  **Packet Timing:** Analyzes Inter-Arrival Time (IAT) distribution on a logarithmic scale to detect machine-generated traffic patterns.
+8.  **Descriptive Statistics & KS Tests:** Pairwise Kolmogorov-Smirnov tests and descriptive statistics for packet size and IAT.
+9.  **Summary Table & Detection Heatmap:** Combined detection effectiveness matrix across all methods (per-column normalised), designed for direct inclusion in the thesis evaluation chapter.
 
 ---
 

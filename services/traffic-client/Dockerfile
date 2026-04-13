@@ -1,5 +1,5 @@
 # Default value for Alpine Linux base image
-ARG ALPINE_TAG=3.23.2
+ARG ALPINE_TAG=3.23
 
 # Use the specified Alpine Linux version from compose.yml
 FROM alpine:${ALPINE_TAG}

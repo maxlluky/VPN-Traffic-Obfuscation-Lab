@@ -1,5 +1,99 @@
 # Lab Notes
 
+## 2026-04-14
+
+### Fixed
+- **Analysis Notebook Cell 11 — Wrong CI Critical Value (z=1.96 → t-distribution):**
+  The 95 % confidence interval was computed as `1.96 × std / √n`, which is the large-sample
+  z-approximation and only valid for n → ∞. With n = 2 streaming runs per scenario the correct
+  critical value is t₀.₉₇₅ with df = n − 1 = 1, which equals **12.706** — 6.5× larger than 1.96.
+  Fixed to use `scipy.stats.t.ppf(0.975, df=n-1)` per row, so the formula automatically scales
+  with any future n. Corrected 95 % CIs: baseline ±2078 Mbps, udp2raw ±6.9 Mbps,
+  obfs4 ±37.6 Mbps. The wide baseline interval (larger than the mean itself) correctly reflects
+  that n = 2 is insufficient for a tight estimate there, and is now an honest finding reported
+  in the thesis rather than a silent underestimate.
+- **Analysis Notebook Cell 1 — Wrong Throughput Metric (`sum_sent` → `sum_received`):**
+  iPerf3 reports both `sum_sent.bits_per_second` (sender-side, includes TCP retransmit
+  overhead) and `sum_received.bits_per_second` (actual goodput at receiver). The notebook was
+  reading `sum_sent`, which overstates goodput by ~0.03–0.12 % across all runs. Switched to
+  `sum_received` — the canonical goodput metric. Retransmit count still read from `sum_sent`.
+
+### Added
+- **`services/target-server/Dockerfile`:** New Dockerfile that pre-installs `iperf3` at
+  build time (`apk add --no-cache iperf3`). Eliminates the previous `entrypoint:` override in
+  `compose.yml` that ran `apk add iperf3` at container startup, which caused the container to
+  exit with code 1 when the Alpine CDN was temporarily unavailable — removing
+  `172.30.30.10` from the network and producing `EHOSTUNREACH` on all 50 HTTP requests.
+- **`services/http-client/Dockerfile`:** New Dockerfile for the IDS validation stack that
+  pre-installs `curl`, `bind-tools`, and `iproute2`. Previously `compose.validate.yml`
+  installed these at runtime via a `command:` override.
+
+### Changed
+- **`apk add` at runtime eliminated across all scenario compose files:**
+  `compose.baseline.yml`, `compose.udp2raw.yml`, and `compose.obfs4.yml` each had a
+  `command:` override on the `client` service that ran `apk add --no-cache curl iperf3` before
+  starting traffic. These packages are already installed in the `traffic-client` Dockerfile.
+  The redundant `command:` overrides are removed; all four scenario stacks now rely solely on
+  Dockerfile layers for dependencies.
+- **`compose/compose.yml` — target service switched to `build:`:** The `target` service now
+  uses `build: context: ../services/target-server` instead of a plain `image:` + runtime
+  entrypoint, consuming the new Dockerfile above.
+- **`compose/compose.validate.yml` — http-client switched to `build:`:** Uses the new
+  `services/http-client/Dockerfile`; runtime `apk add` removed from `command:`.
+- **Dockerfile ARG default tag consistency (`3.23.2` → `3.23`):**
+  `services/traffic-client/Dockerfile` and `services/proxy-obfs4/Dockerfile` had
+  `ARG ALPINE_TAG=3.23.2` as the fallback default while `.env` specifies `ALPINE_TAG=3.23`
+  (the correct tag that exists on Docker Hub). Changed both defaults to `3.23` so that a bare
+  `docker build` without compose args resolves the same image as a full compose build.
+
+---
+
+## 2026-04-13
+
+### Added
+- **Custom WireGuard Behavioral Detection Rules (`services/suricata/rules/local.rules`):**
+  Two new Suricata rules detect WireGuard traffic by **packet structure, not by port number**,
+  providing a realistic behavioral baseline that is meaningful in the context of the thesis evaluation:
+  - **SID 9000001** `CUSTOM WireGuard Handshake Initiator` — UDP payload exactly 148 bytes,
+    first 4 bytes `01 00 00 00` (message type + 3 reserved zero bytes per spec).
+  - **SID 9000002** `CUSTOM WireGuard Handshake Response` — UDP payload exactly 92 bytes,
+    first 4 bytes `02 00 00 00`.
+  Both rules are loaded alongside the ET Open ruleset at container startup without requiring a
+  rebuild (bind-mounted `rules/` directory). The expected outcome is that only the Baseline scenario
+  fires these rules — UDP2RAW and OBFS4 hide the WireGuard framing and must produce zero hits.
+
+- **Analysis Notebook — Statistical Performance Aggregation (Section 5):**
+  The performance section now aggregates **multiple streaming runs per scenario** into
+  mean ± 95 % confidence interval throughput figures. Individual measurements are overlaid as
+  scatter points. A printed statistics table shows n, mean, std, 95 % CI, and overhead per scenario.
+  This addresses the single-run limitation: two streaming runs per scenario (9 total runs)
+  provide statistically defensible throughput values.
+
+- **Analysis Notebook — ET Open vs Custom Rule Breakdown (Section 2):**
+  The Suricata alert section now includes a stacked bar chart distinguishing ET Open rule hits from
+  custom behavioral WireGuard rule hits (SID 9000001/9000002), and a per-run table explicitly
+  confirming which scenarios triggered the custom rules. The markdown description explains the
+  two-layer rule architecture and the expected outcome per scenario.
+
+### Fixed
+- **`services/suricata/rules/local.rules` — Invalid Multi-line Rule Syntax:**
+  The WireGuard detection rules were accidentally written using shell-style backslash line
+  continuation (`\`). Suricata's rule parser does not support this syntax — rules must be on a
+  single line. The rules were silently ignored or caused parse errors. Fixed by collapsing both
+  rules to single lines.
+- **Analysis Notebook Cell 3 — Wrong EVE JSON Field Name (`sid` → `signature_id`):**
+  Suricata's EVE JSON format names the rule ID field `signature_id`, not `sid`. The custom-rule
+  breakdown code checked for a `sid` column which never exists in `alerts_df`, so all custom
+  hit counts were always zero. Fixed to use `signature_id` consistently.
+
+### Changed
+- **Experiment Protocol — Streaming Runs Doubled:**
+  Each scenario is now run **twice in streaming mode** (plus once in burst mode) for 9 total runs
+  (3 scenarios × 3 runs). The README quickstart command updated accordingly.
+- **README — Analysis Guide:** Updated Section 1 (Suricata) to document the two-layer rule
+  architecture and custom rule SIDs. Updated notebook walkthrough to reflect the new statistical
+  performance section and the alert source breakdown.
+
 ## 2026-03-25
 ### Added
 - **nDPI Live Container (`services/ndpi/`):** nDPI now runs as a live Docker container alongside Suricata and Zeek on the bridge interface, replacing the previous offline `ndpiReader` host invocation. Built from source (nDPI 5.0) using a multi-stage Alpine build (~42 MB image). All three detection tools now share the same live capture architecture.

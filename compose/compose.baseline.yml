@@ -47,4 +47,3 @@ services:
         ALPINE_TAG: ${ALPINE_TAG}
     container_name: client-node
     network_mode: "service:wg-client"
-    command: /bin/sh -c "apk add --no-cache curl iperf3 && tail -f /dev/null"

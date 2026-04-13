@@ -19,11 +19,14 @@ services:
         ipv4_address: 172.30.30.2
 
   http-client:
-    image: alpine:${ALPINE_TAG}
+    build:
+      context: ../services/http-client
+      args:
+        ALPINE_TAG: ${ALPINE_TAG}
     container_name: http-client
     cap_add:
       - NET_ADMIN
-    command: /bin/sh -c "apk add --no-cache curl bind-tools && ip route add 172.30.30.0/24 via 192.168.10.2 && tail -f /dev/null"
+    command: /bin/sh -c "ip route add 172.30.30.0/24 via 192.168.10.2 && sleep infinity"
     networks:
       client_net:
         ipv4_address: 192.168.10.10
