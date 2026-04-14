@@ -19,7 +19,7 @@ A reproducible Docker-based testbed to evaluate the detectability of VPN traffic
 7. [Architecture](#architecture)
 8. [Cleanup](#cleanup)
 9. [Troubleshooting](#troubleshooting)
-10. [License & Copyright](#copyright)
+10. [License](#license)
 
 ---
 
@@ -58,7 +58,7 @@ services/
 │   ├── baseline/         – wg0.conf for Baseline
 │   ├── udp2raw/          – wg0.conf for UDP2RAW
 │   └── obfs4/            – wg0.conf for OBFS4
-├── vpn-server/           – WireGuard server configurations
+├── vpn-gateway/           – WireGuard server configurations
 │   ├── baseline/         – Standard MTU config
 │   ├── udp2raw/          – Low MTU + sidecar entrypoint.sh
 │   └── obfs4/            – Low MTU config
@@ -99,7 +99,6 @@ results/runs/<scenario>/<timestamp>/
   # Arch Linux
   sudo pacman -S tcpdump wireshark-cli
   ```
-  > nDPI runs as a container — no host installation required.
 
 ### Setup
 ```bash
@@ -188,14 +187,14 @@ pip install -r analysis/requirements.txt
 Open `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab (select the `.venv` kernel).
 
 ### What the notebook covers
-1. **Metadata** — Run overview, tool versions, reproducibility seeds
-2. **Suricata** — Alert counts per run; stacked breakdown of ET Open vs. custom WireGuard behavioral rule hits (SID 9000001/9000002)
-3. **nDPI** — Protocol fingerprinting results and per-scenario classification
-4. **Zeek** — Flow duration, bytes, and protocol identification from `conn.log`
+1. **IDS Visibility (Suricata & Zeek)** — Alert counts per run; ET Open vs. custom WireGuard rule hits (SID 9000001/9000002); Zeek flow protocol detection
+2. **Deep Packet Inspection (nDPI)** — Protocol fingerprinting results and per-scenario classification
+3. **Traffic Fingerprinting** — Packet size and IAT distributions; TCP vs. UDP breakdown
+4. **Protocol Plausibility Check** — TLS Client Hello presence on TCP/443 flows (UDP2RAW FakeTCP indicator)
 5. **Performance** — Mean ± 95 % CI throughput per scenario (t-distribution, `t.ppf(0.975, df=n−1)`)
-6. **Payload Entropy** — Shannon entropy from raw PCAP payloads
-7. **Packet Statistics & KS Tests** — Size and IAT descriptive stats; pairwise Kolmogorov-Smirnov tests
-8. **Summary Table & Detection Heatmap** — Combined effectiveness matrix for the thesis evaluation chapter
+6. **Shannon Entropy** — Payload randomness from raw PCAP payloads; higher = more effective obfuscation
+7. **Descriptive Statistics & KS Tests** — Size and IAT descriptive stats; pairwise Kolmogorov-Smirnov tests
+8. **Summary Table** — Consolidated scenario × metric matrix for the thesis evaluation chapter
 
 ### Custom WireGuard Detection Rules
 `services/suricata/rules/local.rules` contains two behavioral rules loaded alongside ET Open:
@@ -223,7 +222,7 @@ wg-client  [WireGuard tunnel established]
     ↓  WireGuard encrypted UDP/51820
 [client_net bridge]  ←  Suricata / Zeek / nDPI capture
     ↓  WireGuard encrypted UDP/51820
-vpn-server (192.168.10.2 ↔ 172.30.30.2)  [decrypts]
+vpn-gateway (192.168.10.2 ↔ 172.30.30.2)  [decrypts]
     ↓  plain HTTP
 target-server (172.30.30.10)
 ```
@@ -240,7 +239,7 @@ proxy-udp2raw client  [wraps UDP → fake TCP/443]
     ↓  fake TCP/443
 proxy-udp2raw gateway  [unwraps TCP → UDP/51820]
     ↓  WireGuard UDP/51820
-vpn-server  [decrypts]
+vpn-gateway  [decrypts]
     ↓  plain HTTP
 target-server (172.30.30.10)
 ```
@@ -257,7 +256,7 @@ proxy-obfs4 client  [sslocal -U + obfs4proxy via SIP003]
     ↓  obfuscated UDP/12345
 proxy-obfs4 gateway  [ssserver + obfs4proxy]
     ↓  WireGuard UDP/51820
-vpn-server  [decrypts]
+vpn-gateway  [decrypts]
     ↓  plain HTTP
 target-server (172.30.30.10)
 ```
@@ -270,7 +269,7 @@ target-server (172.30.30.10)
 ```bash
 bash scripts/cleanup.sh          # stop all containers, remove networks & volumes
 bash scripts/cleanup.sh --all    # also remove built images
-sudo rm -rf results/runs/*       # delete experiment results (optional)
+sudo rm -rf results/*            # delete all experiment results (optional)
 ```
 
 ---
@@ -300,6 +299,7 @@ docker logs obfs4-client   # check pt_adapter.py started and certs match
 
 ---
 
-## Copyright
-© Max Luckert. All rights reserved under German copyright law. Private, non-commercial use only.
-Source: [eRecht24.de](https://www.e-recht24.de/)
+## License
+© 2026 Max Luckert. This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+You are free to use, study, modify, and distribute this project, provided that any derivative works are also released under GPL-3.0.
