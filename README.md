@@ -58,7 +58,7 @@ services/
 │   ├── baseline/         – wg0.conf for Baseline
 │   ├── udp2raw/          – wg0.conf for UDP2RAW
 │   └── obfs4/            – wg0.conf for OBFS4
-├── vpn-gateway/           – WireGuard server configurations
+├── vpn-gateway/          – WireGuard server configurations
 │   ├── baseline/         – Standard MTU config
 │   ├── udp2raw/          – Low MTU + sidecar entrypoint.sh
 │   └── obfs4/            – Low MTU config
@@ -93,12 +93,12 @@ results/runs/<scenario>/<timestamp>/
 - Docker Engine ≥ 24.x + Docker Compose v2
 - Kernel WireGuard support (`wireguard`, `udp_tunnel` modules)
 - `tcpdump` and `tshark` on the host:
-  ```bash
-  # Ubuntu/Debian
-  sudo apt install tcpdump tshark
-  # Arch Linux
-  sudo pacman -S tcpdump wireshark-cli
-  ```
+```bash
+# Ubuntu/Debian
+sudo apt install tcpdump tshark
+# Arch Linux
+sudo pacman -S tcpdump wireshark-cli
+```
 
 ### Setup
 ```bash
@@ -187,19 +187,19 @@ pip install -r analysis/requirements.txt
 Open `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab (select the `.venv` kernel).
 
 ### What the notebook covers
-1. **IDS Visibility (Suricata & Zeek)** — Alert counts per run; ET Open vs. custom WireGuard rule hits (SID 9000001/9000002); Zeek flow protocol detection
-2. **Deep Packet Inspection (nDPI)** — Protocol fingerprinting results and per-scenario classification
-3. **Traffic Fingerprinting** — Packet size and IAT distributions; TCP vs. UDP breakdown
-4. **Protocol Plausibility Check** — TLS Client Hello presence on TCP/443 flows (UDP2RAW FakeTCP indicator)
-5. **Performance** — Mean ± 95 % CI throughput per scenario (t-distribution, `t.ppf(0.975, df=n−1)`)
-6. **Shannon Entropy** — Payload randomness from raw PCAP payloads; higher = more effective obfuscation
-7. **Descriptive Statistics & KS Tests** — Size and IAT descriptive stats; pairwise Kolmogorov-Smirnov tests
-8. **Summary Table** — Consolidated scenario × metric matrix for the thesis evaluation chapter
+1. **IDS Visibility (Suricata & Zeek)** - Alert counts per run; ET Open vs. custom WireGuard rule hits (SID 9000001/9000002); Zeek flow protocol detection
+2. **Deep Packet Inspection (nDPI)** - Protocol fingerprinting results and per-scenario classification
+3. **Traffic Fingerprinting** - Packet size and IAT distributions; TCP vs. UDP breakdown
+4. **Protocol Plausibility Check** - TLS Client Hello presence on TCP/443 flows (UDP2RAW FakeTCP indicator)
+5. **Performance** - Mean ± 95 % CI throughput per scenario (t-distribution, `t.ppf(0.975, df=n−1)`)
+6. **Shannon Entropy** - Payload randomness from raw PCAP payloads; higher = more effective obfuscation
+7. **Descriptive Statistics & KS Tests** - Size and IAT descriptive stats; pairwise Kolmogorov-Smirnov tests
+8. **Summary Table** - Consolidated scenario × metric matrix for the thesis evaluation chapter
 
 ### Custom WireGuard Detection Rules
 `services/suricata/rules/local.rules` contains two behavioral rules loaded alongside ET Open:
-- **SID 9000001** — Handshake Initiator: UDP, 148 B payload, first 4 bytes `01 00 00 00`
-- **SID 9000002** — Handshake Response: UDP, 92 B payload, first 4 bytes `02 00 00 00`
+- **SID 9000001** - Handshake Initiator: UDP, 148 B payload, first 4 bytes `01 00 00 00`
+- **SID 9000002** - Handshake Response: UDP, 92 B payload, first 4 bytes `02 00 00 00`
 
 These detect WireGuard by **packet structure**, not port number. Only the Baseline scenario triggers them.
 
