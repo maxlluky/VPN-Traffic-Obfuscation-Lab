@@ -19,7 +19,8 @@ A reproducible Docker-based testbed to evaluate the detectability of VPN traffic
 7. [Architecture](#architecture)
 8. [Cleanup](#cleanup)
 9. [Troubleshooting](#troubleshooting)
-10. [License](#license)
+10. [Citation](#citation)
+11. [License](#license)
 
 ---
 
@@ -295,6 +296,22 @@ docker logs proxy-udp2raw   # verify UDP2RAW_GATEWAY_PORT=443 in .env
 ```bash
 docker logs obfs4-gateway
 docker logs obfs4-client   # check pt_adapter.py started and certs match
+```
+
+---
+
+## Citation
+If you use this code or findings in your research, please cite:
+
+```bibtex
+@thesis{Luckert2026VPNObfuscation,
+  author = {Max Luckert},
+  title  = {Evaluation of VPN Traffic Camouflage and Obfuscation Techniques in Modern Network Security},
+  school = {Wrexham University},
+  year   = {2026},
+  month  = {April},
+  type   = {Bachelor's Thesis}
+}
 ```
 
 ---
