@@ -1,5 +1,16 @@
 # Lab Notes
 
+## 2026-04-18
+
+### Removed
+- **`services/vpn-client/Dockerfile` — unused `tcpdump` package:** The vpn-client image
+  installed `tcpdump`, but the client container never runs it. All packet capture is performed
+  on the host against `$BRIDGE_IF` via `sudo tcpdump` in `scripts/lib.sh::start_tcpdump()`; the
+  only commands executed inside the client container via `docker exec` are `iperf3` and
+  `traffic_gen.py`. Removing the package slims the image without affecting capture, traffic
+  generation, or WireGuard functionality. The host-side `tcpdump` prerequisite documented in
+  `README.md` is unchanged.
+
 ## 2026-04-14
 
 ### Fixed
