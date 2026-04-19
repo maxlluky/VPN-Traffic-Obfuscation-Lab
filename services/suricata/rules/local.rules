@@ -1,5 +1,5 @@
 # Local validation rule — triggers on ANY HTTP traffic regardless of direction.
-# Used by validate_ids.sh to prove the full Suricata alert pipeline works
+# Used by validate_detection_stack.sh to prove the full Suricata alert pipeline works
 # (ET Open rules only match HOME_NET <-> EXTERNAL_NET, not HOME_NET <-> HOME_NET).
 alert http any any -> any any (msg:"LOCAL VALIDATION - HTTP Traffic Detected"; flow:established,to_server; sid:9999999; rev:1;)
 

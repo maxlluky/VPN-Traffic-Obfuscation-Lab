@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scripts/validate_ids.sh
-# Positive control: proves Suricata, Zeek & nDPI are functional by sending
-# plain (unencrypted) HTTP traffic across the monitored bridge interface.
+# scripts/validate_detection_stack.sh
+# Positive control for the full detection stack (Suricata IDS, Zeek NSM, nDPI DPI).
+# Sends plain (unencrypted) HTTP traffic across the monitored bridge interface
+# and verifies each component produces its expected artifacts.
 #
 # Expected outcome:
-#   - Suricata: ET Open HTTP alerts (e.g. ET POLICY, ET INFO)
+#   - Suricata: ET Open HTTP alerts (e.g. ET POLICY, ET INFO) in eve.json
 #   - Zeek:     conn.log entries with service="http"
-#   - nDPI:     Detected protocols (e.g. HTTP)
+#   - nDPI:     Detected protocols (e.g. HTTP) in summary.txt
+#   - PCAP:     Non-empty capture file on disk
 #
 # This validates that the absence of alerts in VPN scenarios is a genuine
 # finding, not a tool misconfiguration.
@@ -27,7 +29,7 @@ PCAP_FILE="$RUN_DIR/validation.pcap"
 mkdir -p "$RUN_DIR"
 
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log "  IDS VALIDATION — Positive Control (Plain HTTP)"
+log "  DETECTION STACK VALIDATION — Positive Control (Plain HTTP)"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── Start stack ──────────────────────────────────────────────

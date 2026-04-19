@@ -11,6 +11,18 @@
   generation, or WireGuard functionality. The host-side `tcpdump` prerequisite documented in
   `README.md` is unchanged.
 
+### Changed
+- **Renamed `scripts/validate_ids.sh` → `scripts/validate_detection_stack.sh`:** The name
+  `validate_ids.sh` implied the script only validates the IDS (Suricata), but it actually
+  exercises the full detection stack: it checks Suricata alerts (`eve.json`), Zeek service
+  detection (`conn.log`), nDPI protocol detection (`summary.txt`), and verifies the PCAP
+  artifact via `tshark` packet count. Renamed for accuracy. Updated the internal file header,
+  the terminal banner (`IDS VALIDATION` → `DETECTION STACK VALIDATION`), the comment reference
+  in `services/suricata/rules/local.rules`, and all `README.md` references (Scripts directory
+  listing, Quickstart command, section heading `## IDS Validation` → `## Detection Stack
+  Validation`, and the Table of Contents anchor). Historical CHANGELOG entries still refer to
+  the old name intentionally — they are immutable records of past changes.
+
 ## 2026-04-14
 
 ### Fixed

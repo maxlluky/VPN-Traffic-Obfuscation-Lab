@@ -14,7 +14,7 @@ A reproducible Docker-based testbed to evaluate the detectability of VPN traffic
 2. [Quickstart](#quickstart)
 3. [Traffic Modes](#traffic-modes)
 4. [Scenarios](#scenarios)
-5. [IDS Validation](#ids-validation)
+5. [Detection Stack Validation](#detection-stack-validation)
 6. [Analysis (Jupyter Notebook)](#analysis-jupyter-notebook)
 7. [Architecture](#architecture)
 8. [Cleanup](#cleanup)
@@ -40,7 +40,7 @@ A reproducible Docker-based testbed to evaluate the detectability of VPN traffic
 scripts/
 ├── run_scenario.sh        – Main experiment runner (all scenarios + traffic modes)
 ├── lib.sh                 – Shared functions (stack management, capture, artifact collection)
-├── validate_ids.sh        – IDS positive control
+├── validate_detection_stack.sh – Detection stack positive control (Suricata, Zeek, nDPI, PCAP)
 ├── cleanup.sh             – Tears down all containers, networks, volumes
 └── pcap_to_packet_csv.sh  – Internal: extracts packet features via tshark
 ```
@@ -112,7 +112,7 @@ cp compose/.env.example compose/.env
 # Edit compose/.env if needed (UDP2RAW_IMAGE, BRIDGE_IF)
 
 # 3. Validate detection stack
-bash scripts/validate_ids.sh
+bash scripts/validate_detection_stack.sh
 
 # 4. Run first experiment
 bash scripts/run_scenario.sh baseline
@@ -166,11 +166,11 @@ WireGuard is encrypted with Shadowsocks-rust (ChaCha20-Poly1305) and obfuscated 
 
 ---
 
-## IDS Validation
+## Detection Stack Validation
 Before drawing conclusions, run the positive control to confirm the detection stack is functional:
 
 ```bash
-bash scripts/validate_ids.sh
+bash scripts/validate_detection_stack.sh
 ```
 
 Sends plain HTTP (no VPN) and expects Suricata ET alerts, Zeek `service=http`, and nDPI HTTP classification. **Absence of alerts in VPN scenarios is a genuine finding, not a misconfiguration.**
