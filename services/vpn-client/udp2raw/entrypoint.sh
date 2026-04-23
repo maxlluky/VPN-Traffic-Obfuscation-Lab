@@ -20,7 +20,5 @@ exec udp2raw \
   -r "$SERVER:$SERVER_PORT" \
   --raw-mode faketcp \
   -k "vpn-lab-obfs" \
-  --cipher-mode xor \
-  --auth-mode simple \
   -a \
   > /dev/stdout 2>&1

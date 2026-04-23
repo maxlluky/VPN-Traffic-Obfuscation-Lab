@@ -23,8 +23,6 @@ if [ "$MODE" = "server" ]; then
     -r "$TARGET_HOST:$TARGET_PORT" \
     --raw-mode faketcp \
     -k "vpn-lab-obfs" \
-    --cipher-mode xor \
-    --auth-mode simple \
     -a \
     > /dev/stdout 2>&1
 else
