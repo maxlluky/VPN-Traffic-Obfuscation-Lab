@@ -185,7 +185,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r analysis/requirements.txt
 ```
-Open `analysis/Analysis_Starter.ipynb` in VS Code or JupyterLab (select the `.venv` kernel).
+Open `analysis/Analysis_Thesis.ipynb` in VS Code or JupyterLab (select the `.venv` kernel).
 
 ### What the notebook covers
 1. **IDS Visibility (Suricata & Zeek)** - Alert counts per run; ET Open vs. custom WireGuard rule hits (SID 9000001/9000002); Zeek flow protocol detection
