@@ -59,7 +59,7 @@ services/
 │   ├── baseline/         – wg0.conf for Baseline
 │   ├── udp2raw/          – wg0.conf for UDP2RAW
 │   └── obfs4/            – wg0.conf for OBFS4
-├── vpn-gateway/          – WireGuard server configurations
+├── vpn-server/           – WireGuard server configurations
 │   ├── baseline/         – Standard MTU config
 │   ├── udp2raw/          – Low MTU + sidecar entrypoint.sh
 │   └── obfs4/            – Low MTU config
@@ -162,7 +162,7 @@ WireGuard UDP is wrapped in fake TCP using udp2raw and tunnelled over port 443. 
 ```bash
 bash scripts/run_scenario.sh obfs4
 ```
-WireGuard is encrypted with Shadowsocks-rust (ChaCha20-Poly1305) and obfuscated via obfs4proxy as a SIP003 plugin (`pt_adapter.py`). Traffic on the wire is **UDP** on port 12345 with randomised payload. nDPI classifies it as Unknown — obfuscation is effective.
+WireGuard UDP is relayed through Shadowsocks-rust (ChaCha20-Poly1305) and obfuscated via obfs4proxy as a SIP003 plugin (`pt_adapter.py`). The runner captures the outer traffic on port 12345, and the notebook derives the observed TCP/UDP transport from PCAP/Zeek data rather than assuming a fixed outer protocol. nDPI classifies it as Unknown — obfuscation is effective.
 
 ---
 
@@ -252,9 +252,9 @@ traffic-client (192.168.10.10)
 wg-client  [WireGuard → 127.0.0.1:51820]
     ↓  WireGuard UDP/51820 (loopback)
 proxy-obfs4 client  [sslocal -U + obfs4proxy via SIP003]
-    ↓  Shadowsocks ChaCha20 + obfs4 randomisation, UDP/12345
+    ↓  Shadowsocks ChaCha20 + obfs4 obfuscation, port 12345
 [client_net bridge]  ←  Suricata / Zeek / nDPI capture
-    ↓  obfuscated UDP/12345
+    ↓  obfuscated port 12345 traffic
 proxy-obfs4 gateway  [ssserver + obfs4proxy]
     ↓  WireGuard UDP/51820
 vpn-gateway  [decrypts]
@@ -262,7 +262,7 @@ vpn-gateway  [decrypts]
 target-server (172.30.30.10)
 ```
 
-> Unlike standard Tor obfs4 (TCP), this setup uses Shadowsocks-rust's `-U` UDP relay mode. The outer transport on the wire is **UDP**, not TCP.
+> Shadowsocks-rust's `-U` flag enables UDP relay for the WireGuard payload. The SIP003/obfs4 adapter is stream-oriented, so the observed outer transport should be read from the generated PCAP/Zeek artifacts.
 
 ---
 

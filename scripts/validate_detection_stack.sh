@@ -71,10 +71,9 @@ docker exec http-client sh -c "
   # ET INFO: EXE download attempt (triggers on .exe extension in URI)
   curl -s -o /dev/null http://172.30.30.10/test.exe 2>/dev/null || true
 
-  # ET POLICY: PE EXE or DLL Windows file download HTTP (content match on MZ header)
-  # We request binary content to generate varied flows
-  curl -s -o /dev/null http://172.30.30.10/assets/dummy_50k.bin 2>/dev/null || true
-  curl -s -o /dev/null http://172.30.30.10/assets/dummy_200k.bin 2>/dev/null || true
+  # Request binary assets to generate varied HTTP flows
+  curl -s -o /dev/null http://172.30.30.10/data/50KB.bin 2>/dev/null || true
+  curl -s -o /dev/null http://172.30.30.10/data/200KB.bin 2>/dev/null || true
 
   # ET INFO: Possible .bat file download (SID 2019137)
   curl -s -o /dev/null http://172.30.30.10/test.bat 2>/dev/null || true
